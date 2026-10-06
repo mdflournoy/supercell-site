@@ -43,8 +43,8 @@ Pick **one** option.
 ### 2. Tell the workflow which folder to read
 
 Go to **Settings → Secrets and variables → Actions → Variables tab → New repository variable**.
-- Name: `GDRIVE_FOLDER_ID`
-- Value: `1JaWWC-JEr4ArHjQmqZ4gYcud9CmYn6GC`
+- Name: -------
+- Value: -------
 
 ### 3. Turn on GitHub Pages
 
