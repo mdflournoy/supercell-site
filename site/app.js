@@ -114,7 +114,8 @@
       try {
         const style = await vectorStyle(dark);
         if (!gl) {
-          gl = L.maplibreGL({ style, attribution: OFM_ATTR, interactive: false }).addTo(map);
+          gl = L.maplibreGL({ style, interactive: false }).addTo(map);
+          map.attributionControl.addAttribution(OFM_ATTR);
         } else {
           gl.getMaplibreMap().setStyle(style);
         }
@@ -122,7 +123,7 @@
       } catch (e) {
         console.warn("Vector basemap unavailable; using raster tiles.", e);
         vectorOK = false;
-        if (gl) { map.removeLayer(gl); gl = null; }
+        if (gl) { map.removeLayer(gl); map.attributionControl.removeAttribution(OFM_ATTR); gl = null; }
       }
     }
     setRasterTiles();
