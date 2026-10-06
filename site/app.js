@@ -377,7 +377,7 @@
 
     // window note
     $("windowNote").textContent = `${fmtT(win[0])} → ${fmtT(win[1])} · ${scs.length} supercell${scs.length === 1 ? "" : "s"} active in window. Charts summarize those whole storms; the map shows track segments ${$("clipTracks").checked ? "inside the window only" : "for the full life of each meso"}.`;
-    location.replace(`#t=${win[0]},${win[1]}`);
+    location.replace(`#t=${win[0]},${win[1]}` + (range[0] !== lo || range[1] !== hi ? `&r=${range[0]},${range[1]}` : ""));
     renderDays();
   }
 
@@ -404,18 +404,33 @@
   $("dayRows").addEventListener("click", (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
     const r = dayStats.find((d) => d.ci === +tr.dataset.ci);
-    setWindow(r.t0 - 900, r.t1 + 900, { fit: true });
+    zoomToEvent(r.t0, r.t1);
     $("daySelect").value = r.ci;
   });
 
   // ---------------------------------------------------------------- time controls
   const slider = $("slider");
   noUiSlider.create(slider, { start: win, connect: true, step: 60, range: { min: lo, max: hi }, behaviour: "tap-drag" });
+  // The slider's own span ("range") can zoom to one event for finer scrubbing;
+  // "All data" (either button) restores the full span.
+  let range = [lo, hi];
+  function setRange(a, b) {
+    range = [Math.max(lo, a), Math.min(hi, b)];
+    slider.noUiSlider.updateOptions({ range: { min: range[0], max: range[1] } }, false);
+    $("scaleMin").textContent = fmtT(range[0]); $("scaleMax").textContent = fmtT(range[1]);
+  }
+  const Q = 900; // 15-min padding/rounding for an event's span
+  function zoomToEvent(t0, t1) {
+    const a = Math.floor((t0 - Q) / Q) * Q, b = Math.ceil((t1 + Q) / Q) * Q;
+    setRange(a, b);
+    setWindow(a, b, { fit: true });
+  }
   $("scaleMin").textContent = fmtT(lo); $("scaleMax").textContent = fmtT(hi);
   let raf = 0, fitNext = false;
   function setWindow(a, b, { fit = false, fromSlider = false } = {}) {
     a = Math.max(lo, Math.min(a, hi)); b = Math.max(lo, Math.min(b, hi));
     if (b < a) [a, b] = [b, a];
+    if (a < range[0] || b > range[1]) setRange(lo, hi); // typed/hash window outside the zoomed span
     win = [a, b];
     $("tStart").value = toInput(a); $("tEnd").value = toInput(b);
     if (!fromSlider) slider.noUiSlider.set([a, b], false);
@@ -429,7 +444,7 @@
   $("tStart").addEventListener("change", () => setWindow(fromInput($("tStart").value), win[1]));
   $("tEnd").addEventListener("change", () => setWindow(win[0], fromInput($("tEnd").value)));
   $("allBtn2").addEventListener("click", () => $("allBtn").click());
-  $("allBtn").addEventListener("click", () => { $("daySelect").value = ""; $("yearSelect").value = ""; setWindow(lo, hi, { fit: true }); });
+  $("allBtn").addEventListener("click", () => { $("daySelect").value = ""; $("yearSelect").value = ""; setRange(lo, hi); setWindow(lo, hi, { fit: true }); });
 
   dayStats.slice().sort((x, y) => (x.date < y.date ? 1 : -1)).forEach((d) => {
     $("daySelect").insertAdjacentHTML("beforeend", `<option value="${d.ci}">${d.date} — ${d.sc} supercells, ${d.tor} tornadoes</option>`);
@@ -438,12 +453,13 @@
     if (e.target.value === "") return;
     const d = dayStats.find((x) => x.ci === +e.target.value);
     $("yearSelect").value = "";
-    setWindow(d.t0 - 900, d.t1 + 900, { fit: true });
+    zoomToEvent(d.t0, d.t1);
   });
   [...new Set(C.map((c) => c.date.slice(0, 4)))].sort().reverse().forEach((y) => $("yearSelect").insertAdjacentHTML("beforeend", `<option>${y}</option>`));
   $("yearSelect").addEventListener("change", (e) => {
     if (!e.target.value) return;
     $("daySelect").value = "";
+    setRange(lo, hi);
     setWindow(Date.UTC(+e.target.value, 0, 1) / 1000, Date.UTC(+e.target.value + 1, 0, 1) / 1000 - 60, { fit: true });
   });
   ["showNon", "showTorM", "showPaths", "clipTracks"].forEach((id) => $(id).addEventListener("change", () => render()));
@@ -460,6 +476,7 @@
   try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; setTiles(); } catch (_) {}
 
   // initial window: from URL hash, else everything
-  const m = location.hash.match(/t=(\d+),(\d+)/);
+  const m = location.hash.match(/t=(\d+),(\d+)/), mr = location.hash.match(/r=(\d+),(\d+)/);
+  if (mr) setRange(+mr[1], +mr[2]);
   if (m) setWindow(+m[1], +m[2], { fit: true }); else setWindow(lo, hi, { fit: true });
 })();
