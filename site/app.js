@@ -365,11 +365,11 @@
       kpi(`${nf(totMin / 60, totMin < 600 ? 1 : 0)} h`, "Total meso duration", allMesos.length ? `${dur(totMin / allMesos.length)} per meso` : "—");
 
     // donuts
-    donut("pieSc", torSc.length, scs.length - torSc.length, "Supercell count", ["Tornadic", "Non-tornadic"]);
+    donut("pieSc", torSc.length, scs.length - torSc.length, "Supercell count", ["Tornadic", "Nontornadic"]);
     const tm = allMesos.filter((m) => m.tornadic).length;
-    donut("pieMeso", tm, allMesos.length - tm, "Mesocyclone count", ["Tornadic", "Non-tornadic"]);
+    donut("pieMeso", tm, allMesos.length - tm, "Mesocyclone count", ["Tornadic", "Nontornadic"]);
     const tmt = torScMesos.filter((m) => m.tornadic).length;
-    donut("pieMesoTs", tmt, torScMesos.length - tmt, "Mesocyclones in tornadic supercells", ["Tornadic", "Non-tornadic"]);
+    donut("pieMesoTs", tmt, torScMesos.length - tmt, "Mesocyclones in tornadic supercells", ["Tornadic", "Nontornadic"]);
 
     // histogram: mesos per supercell (integer bins)
     const counts = scs.map((s) => s.mesos.length), maxN = Math.max(1, ...counts);
@@ -404,7 +404,7 @@
       labels: modes,
       datasets: [
         barDs(modes.map((md) => scs.filter((x) => x.end === md && x.tornadic).length), css("--tor"), "Tornadic"),
-        barDs(modes.map((md) => scs.filter((x) => x.end === md && !x.tornadic).length), css("--nontor"), "Non-tornadic"),
+        barDs(modes.map((md) => scs.filter((x) => x.end === md && !x.tornadic).length), css("--nontor"), "Nontornadic"),
       ],
     }, o4);
 

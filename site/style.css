@@ -9,7 +9,7 @@
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --ring: rgba(11, 11, 11, 0.10);
-  --nontor: #2a78d6;   /* non-tornadic (categorical slot 1) */
+  --nontor: #2a78d6;   /* nontornadic (categorical slot 1) */
   --tor: #e34948;      /* tornadic (categorical slot 8) */
   --torpath: #0b0b0b;  /* tornado damage path: heavy ink line */
   --accent: #2a78d6;

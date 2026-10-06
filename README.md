@@ -97,7 +97,7 @@ cd site && python -m http.server 8000      # open http://localhost:8000
 
 ## Dashboard features
 
-- Pan/zoom map (Leaflet + OpenFreeMap vector basemap with state/county lines; sharp on high-DPI screens). Non-tornadic mesos are blue, tornadic mesos red,
+- Pan/zoom map (Leaflet + OpenFreeMap vector basemap with state/county lines; sharp on high-DPI screens). Nontornadic mesos are blue, tornadic mesos red,
   and NCEI tornado paths are drawn in black with width scaled by EF. Hover a track to see
   its whole supercell; click any track or path for details and a link to the NCEI event.
 - Time window: a dual-handle slider, exact UTC start/end inputs, "Jump to a day", a year
@@ -105,7 +105,7 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   specific window.
 - KPIs: supercells, mesocyclones, linked tornadoes (and how many are EF2+), and the median
   time to first tornado.
-- Donut charts: tornadic vs. non-tornadic supercells, mesocyclones, and mesocyclones
+- Donut charts: tornadic vs. nontornadic supercells, mesocyclones, and mesocyclones
   within tornadic supercells.
 - Histograms: mesocyclones per supercell, time from track start to first tornado, and
   mesocyclone lifetime.
