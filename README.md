@@ -91,7 +91,7 @@ cd site && python -m http.server 8000      # open http://localhost:8000
 
 ## Dashboard features
 
-- Pan/zoom map (Leaflet, CARTO basemap). Non-tornadic mesos are blue, tornadic mesos red,
+- Pan/zoom map (Leaflet, Esri gray basemap with state/county lines). Non-tornadic mesos are blue, tornadic mesos red,
   and NCEI tornado paths are drawn in black with width scaled by EF. Hover a track to see
   its whole supercell; click any track or path for details and a link to the NCEI event.
 - Time window: a dual-handle slider, exact UTC start/end inputs, "Jump to a day", a year

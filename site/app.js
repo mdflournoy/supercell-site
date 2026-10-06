@@ -60,15 +60,29 @@
   // ---------------------------------------------------------------- map
   const map = L.map("map", { preferCanvas: true, zoomSnap: 0.25, worldCopyJump: true }).setView([36, -92], 5);
   const renderer = L.canvas({ tolerance: 6 });
-  let tiles;
+  map.createPane("refPane").style.zIndex = 350; // labels/boundaries: above basemap, below tracks
+  map.getPane("refPane").style.pointerEvents = "none";
+  // Esri gray canvas basemap (no API key) + its reference layer (state/county lines, labels).
+  let tiles = [];
   const isDark = () => css("--surface").toLowerCase() === "#1a1a19";
+  const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
   function setTiles() {
-    if (tiles) map.removeLayer(tiles);
-    const style = isDark() ? "dark_all" : "light_all";
-    tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-      subdomains: "abcd", maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    }).addTo(map);
+    tiles.forEach((t) => map.removeLayer(t));
+    const v = isDark() ? "Dark" : "Light";
+    const opts = { maxZoom: 16, maxNativeZoom: 16, attribution: "Basemap &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors" };
+    const base = L.tileLayer(`${ESRI}World_${v}_Gray_Base/MapServer/tile/{z}/{y}/{x}`, opts);
+    const ref = L.tileLayer(`${ESRI}World_${v}_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, { ...opts, attribution: "", pane: "refPane", opacity: 0.9 });
+    // fall back to OpenStreetMap if Esri is unreachable
+    let failed = 0;
+    base.on("tileerror", () => {
+      if (++failed === 6) {
+        tiles.forEach((t) => map.removeLayer(t));
+        tiles = [L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map)];
+        tiles[0].bringToBack();
+      }
+    });
+    tiles = [base.addTo(map), ref.addTo(map)];
+    base.bringToBack();
   }
   setTiles();
   L.control.scale({ imperial: true, metric: true }).addTo(map);
