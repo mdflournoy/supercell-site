@@ -182,3 +182,19 @@ footer a { color: var(--ink-2); }
   .map-card { min-height: 480px; }
   #map { min-height: 400px; }
 }
+
+/* Map scale bar: full border on each box */
+.leaflet-control-scale-line,
+.leaflet-control-scale-line:not(:first-child),
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+  border: 1.5px solid var(--muted);
+  margin-top: 0;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--ink-2);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-shadow: none;
+}
+.leaflet-control-scale-line + .leaflet-control-scale-line { margin-top: 3px; }
