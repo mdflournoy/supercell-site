@@ -1,0 +1,87 @@
+name: Nightly rebuild
+
+on:
+  schedule:
+    # Midnight US Central. GitHub cron is UTC-only, so fire at both 05:00 and 06:00 UTC;
+    # the gate job keeps only the run that is actually 00:xx in Chicago (CDT or CST).
+    # Note: GitHub can delay scheduled runs by several minutes, occasionally more.
+    - cron: "0 5 * * *"
+    - cron: "0 6 * * *"
+  workflow_dispatch:      # "Run workflow" button for a manual rebuild
+  push:
+    branches: [main]
+    paths: ["site/**", "scripts/**", "requirements.txt", ".github/workflows/**"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+    steps:
+      - id: check
+        # Decide by WHICH cron fired (robust to GitHub's start delays):
+        # the 05 UTC trigger is midnight during CDT, the 06 UTC trigger during CST.
+        run: |
+          zone=$(TZ=America/Chicago date +%Z)
+          cron="${{ github.event.schedule }}"
+          if [ "${{ github.event_name }}" != "schedule" ] \
+             || { [ "$cron" = "0 5 * * *" ] && [ "$zone" = "CDT" ]; } \
+             || { [ "$cron" = "0 6 * * *" ] && [ "$zone" = "CST" ]; }; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "Trigger '$cron' isn't midnight while Chicago is on $zone — skipping."
+          fi
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Cache NCEI Storm Events files
+        uses: actions/cache@v4
+        with:
+          path: data/ncei
+          key: ncei-${{ github.run_id }}
+          restore-keys: ncei-
+
+      - name: Download CSVs from Google Drive
+        env:
+          GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
+        run: python scripts/fetch_drive.py --out data/raw
+
+      - name: Build data.json
+        run: python scripts/build_data.py --raw data/raw --out site/data.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

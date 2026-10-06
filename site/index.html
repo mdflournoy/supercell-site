@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supercell Tracks</title>
+<meta name="description" content="Mesocyclone tracks and associated tornadoes from MesoTrack analyses, updated nightly.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 8h20M8 13h16M11 18h10M13 23h6M15 27h2' stroke='%232a78d6' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1>Supercell Tracks</h1>
+      <span class="sub" id="updated">Loading…</span>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn ghost" id="themeBtn" title="Toggle light/dark" aria-label="Toggle light/dark theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="filters" aria-label="Time window">
+    <div class="label">Time window</div>
+    <div class="range-inputs">
+      <input type="datetime-local" id="tStart" step="60" aria-label="Window start (UTC)">
+      <span>→</span>
+      <input type="datetime-local" id="tEnd" step="60" aria-label="Window end (UTC)">
+      <span class="utc">UTC</span>
+    </div>
+    <div class="presets">
+      <select id="daySelect" aria-label="Jump to a day"><option value="">Jump to a day…</option></select>
+      <select id="yearSelect" aria-label="Year"><option value="">Year…</option></select>
+      <button id="allBtn">All data</button>
+    </div>
+    <div class="slider-row">
+      <div id="slider"></div>
+      <div class="slider-scale"><span id="scaleMin"></span><span id="scaleMax"></span></div>
+    </div>
+    <div class="window-note" id="windowNote"></div>
+  </section>
+
+  <div class="warn" id="ncei-warn"></div>
+
+  <section class="grid-main">
+    <div class="card map-card">
+      <div class="map-head">
+        <h2 style="margin:0">Mesocyclone tracks &amp; tornadoes</h2>
+        <div class="toggles">
+          <label><input type="checkbox" id="showNon" checked> Non-tornadic mesos</label>
+          <label><input type="checkbox" id="showTorM" checked> Tornadic mesos</label>
+          <label><input type="checkbox" id="showPaths" checked> Tornado paths</label>
+          <label><input type="checkbox" id="clipTracks" checked> Clip to window</label>
+          <button id="fitBtn" style="padding:4px 10px">Zoom to tracks</button>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="legend">
+        <span class="key"><span class="sw non"></span>Non-tornadic mesocyclone</span>
+        <span class="key"><span class="sw tor"></span>Tornadic mesocyclone</span>
+        <span class="key"><span class="sw path"></span>Tornado path (NCEI), width ∝ EF</span>
+        <span class="key"><span class="dot"></span>Meso track start</span>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="kpis" id="kpis"></div>
+      <div class="card">
+        <h2>Tornadic vs. non-tornadic</h2>
+        <p class="hint">Share that produced at least one tornado</p>
+        <div class="donuts">
+          <div class="donut-row">
+            <div class="donut-box"><canvas id="pieSc"></canvas><div class="donut-center" id="pieScC"></div></div>
+            <div class="donut-text" id="pieScT"></div>
+          </div>
+          <div class="donut-row">
+            <div class="donut-box"><canvas id="pieMeso"></canvas><div class="donut-center" id="pieMesoC"></div></div>
+            <div class="donut-text" id="pieMesoT"></div>
+          </div>
+          <div class="donut-row">
+            <div class="donut-box"><canvas id="pieMesoTs"></canvas><div class="donut-center" id="pieMesoTsC"></div></div>
+            <div class="donut-text" id="pieMesoTsT"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="grid-charts">
+    <div class="card">
+      <h2>Mesocyclones per supercell</h2>
+      <p class="hint">Number of supercells by meso count</p>
+      <div class="chart-box"><canvas id="histMeso"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Time from track start to first tornado</h2>
+      <p class="hint" id="ttHint">Tornadic supercells · minutes after first meso detection</p>
+      <div class="chart-box"><canvas id="histTT"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Mesocyclone lifetime</h2>
+      <p class="hint">First to last tracked scan, minutes</p>
+      <div class="chart-box"><canvas id="histLife"></canvas></div>
+    </div>
+  </section>
+
+  <section class="grid-bottom">
+    <div class="card">
+      <h2>How mesocyclones ended</h2>
+      <p class="hint">Dissipation mode from MesoTrack</p>
+      <div class="chart-box"><canvas id="barEnd"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Tornado ratings</h2>
+      <p class="hint">Linked tornadoes by EF (NCEI)</p>
+      <div class="chart-box"><canvas id="barEF"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Days</h2>
+      <p class="hint">Click a day to set the window and zoom the map</p>
+      <div class="table-wrap">
+        <table class="days">
+          <thead><tr>
+            <th data-k="date">Date</th><th data-k="sc">Supercells</th><th data-k="tsc">Tornadic</th>
+            <th data-k="m">Mesos</th><th data-k="tor">Tornadoes</th><th data-k="maxef">Max EF</th>
+          </tr></thead>
+          <tbody id="dayRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span id="foot"></span>
+    <span>Tornado data: <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">NCEI Storm Events Database</a> · Basemap © OpenStreetMap, © CARTO</span>
+  </footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
