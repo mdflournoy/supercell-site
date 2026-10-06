@@ -35,13 +35,18 @@
   S.forEach((s, i) => {
     s.i = i;
     s.tornadic = s.mesos.some((mi) => M[mi].tornadic);
-    s.tors = s.mesos.flatMap((mi) => M[mi].tor);
+    s.tors = [...new Set(s.mesos.flatMap((mi) => M[mi].tor))];
     const starts = s.tors.map((ti) => T[ti]).filter((t) => t.ncei).map((t) => t.t0);
     s.firstTor = starts.length ? Math.min(...starts) : null;
     s.tt = s.firstTor != null ? (s.firstTor - s.t0) / 60 : null;
     s.date = C[s.case].date;
   });
-  T.forEach((t, i) => { t.i = i; t.sc = M[t.meso].sc; });
+  T.forEach((t, i) => {
+    t.i = i; t.sc = M[t.mesos[0]].sc;
+    t.drawn = t.segs.filter((g) => g.path);
+    t.mlabels = t.mesos.map((mi) => M[mi].label).join(", ");
+  });
+  const uniq = (ids) => [...new Set(ids)];
 
   const tMin = Math.min(...S.map((s) => s.t0)), tMax = Math.max(...S.map((s) => s.t1));
   const H = 3600, lo = Math.floor(tMin / H) * H, hi = Math.ceil(tMax / H) * H;
@@ -53,7 +58,7 @@
   $("foot").textContent = `Built from ${C.length} MesoTrack file${C.length === 1 ? "" : "s"}` + (D.problems.length ? ` · ${D.problems.length} parse warning(s), see console` : "");
   if (D.problems.length) console.warn("Data build warnings:\n" + D.problems.join("\n"));
   if (D.ncei_missing) {
-    $("ncei-warn").textContent = `${D.ncei_missing} linked tornado${D.ncei_missing === 1 ? " isn't" : "es aren't"} in the NCEI Storm Events database yet (NCEI typically publishes ~2–3 months after an event). They still count toward tornadic totals but have no path on the map or start time for the timing chart until NCEI posts them.`;
+    $("ncei-warn").textContent = `${D.ncei_missing} linked tornado${D.ncei_missing === 1 ? " wasn't" : "es weren't"} found in the tornado database or in NCEI Storm Events (NCEI typically publishes ~2–3 months after an event). They still count toward tornadic totals but have no path on the map or start time for the timing chart until the record exists.`;
     $("ncei-warn").classList.add("show");
   }
 
@@ -95,8 +100,8 @@
     const tors = m.tor.map((ti) => T[ti]);
     const torRows = tors.length
       ? tors.map((t) => t.ncei
-        ? `<tr><td><span class="ef-chip">${efLabel(t.ef)}</span></td><td>${fmtHM(t.t0)}–${fmtHM(t.t1)} · ${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.dth ? ` · ${t.dth} death${t.dth > 1 ? "s" : ""}` : ""} · <a href="${nceiLink(t.event)}" target="_blank" rel="noopener">NCEI ${t.event}</a></td></tr>`
-        : `<tr><td><span class="ef-chip">?</span></td><td>Event ${t.event ?? "—"} not in NCEI yet</td></tr>`).join("")
+        ? `<tr><td><span class="ef-chip">${efLabel(t.ef)}</span></td><td>${fmtHM(t.t0)}–${fmtHM(t.t1)} · ${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}${t.dth ? ` · ${t.dth} death${t.dth > 1 ? "s" : ""}` : ""}</td></tr>`
+        : `<tr><td><span class="ef-chip">?</span></td><td>Event ${t.id ?? "—"} not found yet</td></tr>`).join("")
       : `<tr><td>Tornadoes</td><td>None</td></tr>`;
     return `<div class="pop">
       <h3>Meso ${m.label} · supercell ${s.label}</h3>
@@ -143,20 +148,24 @@
     if (showPaths) {
       for (const ti of sel.paths) {
         const t = T[ti];
-        const w = [3.5, 4.5, 5.5, 7, 8.5, 10][efNum(t.ef)] ?? 3.5;
-        const same = t.path[0][0] === t.path[1][0] && t.path[0][1] === t.path[1][1];
-        const tip = `<b>${efLabel(t.ef)} tornado</b><br>${fmtT(t.t0)}–${fmtHM(t.t1)}<br>${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.wid ? ` · ${t.wid} yd` : ""}`;
-        const pop = `<div class="pop"><h3>${efLabel(t.ef)} tornado</h3><div class="meta">Meso ${M[t.meso].label} · supercell ${S[t.sc].label} · ${S[t.sc].date}</div><table>
-            <tr><td>Time</td><td>${fmtT(t.t0)} → ${fmtHM(t.t1)}</td></tr><tr><td>Location</td><td>${t.where}</td></tr>
-            <tr><td>Path</td><td>${t.len ?? "—"} mi × ${t.wid ?? "—"} yd</td></tr><tr><td>Casualties</td><td>${t.inj} injuries, ${t.dth} deaths</td></tr>
-            <tr><td>NCEI</td><td><a href="${nceiLink(t.event)}" target="_blank" rel="noopener">Event ${t.event}</a></td></tr></table></div>`;
-        let shape;
-        if (same) shape = L.circleMarker(t.path[0], { renderer, radius: w / 1.4 + 1, color: surface, weight: 2, fillColor: pathC, fillOpacity: 1 });
-        else {
-          L.polyline(t.path, { renderer, color: surface, weight: w + 3, opacity: 0.9, lineCap: "round", interactive: false }).addTo(layer); // halo
-          shape = L.polyline(t.path, { renderer, color: pathC, weight: w, opacity: 1, lineCap: "round" });
+        const tip = `<b>${efLabel(t.ef)} tornado</b>${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}<br>${fmtT(t.t0)}–${fmtHM(t.t1)}<br>${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.wid ? ` · max ${t.wid} yd` : ""}`;
+        const segRows = t.segs.map((g) => `<tr><td><span class="ef-chip">${efLabel(g.ef)}</span></td><td>${fmtHM(g.t0)}–${fmtHM(g.t1)} · ${g.where}${g.len != null ? ` · ${g.len} mi` : ""} · <a href="${nceiLink(g.event)}" target="_blank" rel="noopener">${g.event}</a>${t.linked.includes(g.event) ? " ◂ linked" : ""}${g.path ? "" : " (no location)"}</td></tr>`).join("");
+        const pop = `<div class="pop"><h3>${efLabel(t.ef)} tornado${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}</h3><div class="meta">Meso ${t.mlabels} · supercell ${S[t.sc].label} · ${S[t.sc].date}</div><table>
+            <tr><td>Time</td><td>${fmtT(t.t0)} → ${fmtHM(t.t1)} (${dur((t.t1 - t.t0) / 60)})</td></tr><tr><td>Location</td><td>${t.where}</td></tr>
+            <tr><td>Path</td><td>${t.len ?? "—"} mi total · max width ${t.wid ?? "—"} yd</td></tr><tr><td>Casualties</td><td>${t.inj} injuries, ${t.dth} deaths</td></tr>
+            ${t.partial ? `<tr><td>Note</td><td>From NCEI only; other segments may exist</td></tr>` : ""}
+            </table><table style="margin-top:8px">${segRows}</table></div>`;
+        const shapes = [];
+        for (const g of t.drawn) {
+          const w = [3.5, 4.5, 5.5, 7, 8.5, 10][efNum(g.ef)] ?? 3.5;
+          const same = g.path[0][0] === g.path[1][0] && g.path[0][1] === g.path[1][1];
+          if (same) shapes.push(L.circleMarker(g.path[0], { renderer, radius: w / 1.4 + 1, color: surface, weight: 2, fillColor: pathC, fillOpacity: 1 }));
+          else {
+            L.polyline(g.path, { renderer, color: surface, weight: w + 3, opacity: 0.9, lineCap: "round", interactive: false }).addTo(layer); // halo
+            shapes.push(L.polyline(g.path, { renderer, color: pathC, weight: w, opacity: 1, lineCap: "round" }));
+          }
         }
-        shape.bindTooltip(tip, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] }).bindPopup(pop, { maxWidth: 380 }).addTo(layer);
+        shapes.forEach((sh) => sh.bindTooltip(tip, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] }).bindPopup(pop, { maxWidth: 440 }).addTo(layer));
       }
     }
   }
@@ -164,7 +173,7 @@
   function fitToSelection(sel) {
     const ll = [];
     sel.mesos.forEach((mi) => M[mi].pts.forEach((p) => { if (!$("clipTracks").checked || (p[0] >= win[0] && p[0] <= win[1])) ll.push([p[1], p[2]]); }));
-    sel.paths.forEach((ti) => ll.push(...T[ti].path));
+    sel.paths.forEach((ti) => T[ti].drawn.forEach((g) => ll.push(...g.path)));
     if (ll.length) map.fitBounds(L.latLngBounds(ll), { padding: [30, 30], maxZoom: 10 });
   }
 
@@ -233,7 +242,7 @@
     const [a, b] = win;
     const scs = S.filter((s) => s.t0 <= b && s.t1 >= a);
     const mesos = scs.flatMap((s) => s.mesos).filter((mi) => M[mi].t0 <= b && M[mi].t1 >= a);
-    const paths = T.filter((t) => t.ncei && t.path && t.t0 <= b && t.t1 >= a && (!$("clipTracks").checked || true)).map((t) => t.i);
+    const paths = T.filter((t) => t.ncei && t.drawn.length && t.t0 <= b && t.t1 >= a).map((t) => t.i);
     return { scs, mesos, paths };
   }
 
@@ -246,7 +255,7 @@
     const allMesos = scs.flatMap((s) => s.mesos).map((mi) => M[mi]);
     const torSc = scs.filter((s) => s.tornadic);
     const torScMesos = torSc.flatMap((s) => s.mesos).map((mi) => M[mi]);
-    const tors = scs.flatMap((s) => s.tors).map((ti) => T[ti]);
+    const tors = uniq(scs.flatMap((s) => s.tors)).map((ti) => T[ti]);
     const tts = torSc.map((s) => s.tt).filter((v) => v != null);
     const lifes = allMesos.map((m) => m.life);
     const days = new Set(scs.map((s) => s.case)).size;
@@ -320,7 +329,7 @@
   // ---------------------------------------------------------------- days table
   const dayStats = C.map((c, ci) => {
     const scs = c.sc.map((i) => S[i]);
-    const tors = scs.flatMap((s) => s.tors).map((ti) => T[ti]);
+    const tors = uniq(scs.flatMap((s) => s.tors)).map((ti) => T[ti]);
     const efs = tors.filter((t) => t.ncei).map((t) => efNum(t.ef));
     return { ci, date: c.date, sc: scs.length, tsc: scs.filter((s) => s.tornadic).length, m: scs.reduce((n, s) => n + s.mesos.length, 0),
       tor: tors.length, maxef: efs.length ? Math.max(...efs) : -2, t0: Math.min(...scs.map((s) => s.t0)), t1: Math.max(...scs.map((s) => s.t1)) };

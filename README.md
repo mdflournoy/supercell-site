@@ -6,8 +6,12 @@ every night at midnight US Central by GitHub Actions and served on GitHub Pages.
 **What runs each night**
 
 1. `scripts/fetch_drive.py` downloads every `.csv` in the Google Drive folder (subfolders included).
-2. `scripts/build_data.py` parses each MesoTrack file, looks up each linked tornado's
-   NCEI Storm Events record (path, EF rating, times, casualties), and writes `site/data.json`.
+2. `scripts/build_data.py` parses each MesoTrack file and resolves each linked NCEI event ID
+   to the **whole tornado** using the 1950–2024 tornado database CSV in the same folder
+   (any CSV with `oneTorID` and `stormEventsReportID` columns): every segment sharing the
+   linked segment's `oneTorID` is plotted, and totals (length, max EF, casualties, start/end)
+   are computed across segments. Event IDs not in the database (e.g. 2025+) fall back to a
+   single segment from NCEI Storm Events. Writes `site/data.json`.
 3. The `site/` folder is deployed to GitHub Pages.
 
 ## One-time setup (≈10 minutes)
@@ -68,10 +72,12 @@ Tornadoes
 A1,1089126        <- supercell A, meso 1, NCEI Storm Events EVENT_ID
 ```
 
+- Links are counted as **whole tornadoes**: two links that are segments of the same tornado
+  (same `oneTorID`) count once. A tornado linked to two mesos makes both tornadic.
 - A **mesocyclone** is tornadic if at least one tornado is linked to it.
   A **supercell** is tornadic if any of its mesocyclones is.
-- **Time to first tornado** is the earliest linked tornado's NCEI begin time minus the
-  supercell's first tracked scan.
+- **Time to first tornado** is the earliest linked tornado's start (first segment's
+  `beginUnix`) minus the supercell's first tracked scan.
 - NCEI times are in local standard time and get converted to UTC using each
   record's `CZ_TIMEZONE`.
 - NCEI usually publishes events about 2–3 months after they happen. Until then, a linked

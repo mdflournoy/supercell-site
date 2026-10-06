@@ -63,7 +63,7 @@
       <div class="legend">
         <span class="key"><span class="sw non"></span>Non-tornadic mesocyclone</span>
         <span class="key"><span class="sw tor"></span>Tornadic mesocyclone</span>
-        <span class="key"><span class="sw path"></span>Tornado path (NCEI), width ∝ EF</span>
+        <span class="key"><span class="sw path"></span>Tornado path, all segments (width ∝ segment EF)</span>
         <span class="key"><span class="dot"></span>Meso track start</span>
       </div>
     </div>
@@ -117,7 +117,7 @@
     </div>
     <div class="card">
       <h2>Tornado ratings</h2>
-      <p class="hint">Linked tornadoes by EF (NCEI)</p>
+      <p class="hint">Linked tornadoes by max EF across segments</p>
       <div class="chart-box"><canvas id="barEF"></canvas></div>
     </div>
     <div class="card">
@@ -137,7 +137,7 @@
 
   <footer>
     <span id="foot"></span>
-    <span>Tornado data: <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">NCEI Storm Events Database</a> · Basemap © Esri, © OpenStreetMap contributors</span>
+    <span>Tornado data: 1950–2024 tornado database (segments joined by oneTorID), <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">NCEI Storm Events</a> for newer events · Basemap © Esri, © OpenStreetMap contributors</span>
   </footer>
 </div>
 

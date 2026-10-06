@@ -30,6 +30,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 import ncei  # noqa: E402
+import tordb  # noqa: E402
 
 
 def clean_id(v) -> str:
@@ -66,9 +67,14 @@ def main() -> None:
     ap.add_argument("--ncei-local", default=None, help="folder of pre-downloaded NCEI details files (testing)")
     a = ap.parse_args()
 
-    files = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv")
+    allcsv = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv")
+    db_files = [p for p in allcsv if tordb.is_tordb(p)]
+    files = [p for p in allcsv if p not in db_files]
     if not files:
-        sys.exit(f"No CSVs in {a.raw}")
+        sys.exit(f"No MesoTrack CSVs in {a.raw}")
+    db = tordb.TorDB(db_files) if db_files else None
+    if db is None:
+        print("! No tornado database CSV (with a oneTorID column) found; using NCEI segments only")
 
     cases, supercells, mesos, tornadoes = [], [], [], []
     pending_links = []   # (meso_idx, event_id, case_label)
@@ -124,36 +130,72 @@ def main() -> None:
         s["t0"], s["t1"] = min(ts), max(ts)
         s["id"] = f"{cases[s['case']]['date']} {s['label']}"
 
-    # ---- NCEI tornado records ------------------------------------------------------------
-    years = {int(cases[supercells[mesos[mi]["sc"]]["case"]]["date"][:4]) for mi, _, _ in pending_links}
-    nc = ncei.load_tornadoes(years, Path(a.ncei_cache), Path(a.ncei_local) if a.ncei_local else None) if years else pd.DataFrame()
-    by_id = {int(r.EVENT_ID): r for r in nc.itertuples()} if len(nc) else {}
+    # ---- tornadoes: whole tornadoes from the DB (oneTorID); NCEI download only as fallback ----
+    def evid(ev):
+        return int(float(ev)) if re.fullmatch(r"\d+(\.0)?", ev or "") else None
 
-    missing = 0
-    for mi, ev, fname in pending_links:
-        evid = int(float(ev)) if re.fullmatch(r"\d+(\.0)?", ev or "") else None
-        r = by_id.get(evid) if evid is not None else None
-        t = {"event": evid, "meso": mi, "ncei": r is not None}
-        if r is not None:
+    resolved = {}  # (mi, evid) -> tornado dict or None
+    need_ncei = set()
+    for mi, ev, _ in pending_links:
+        e = evid(ev)
+        t = db.tornado(e) if (db is not None and e is not None) else None
+        resolved[(mi, e)] = t
+        if t is None and e is not None:
+            need_ncei.add((mi, e))
+
+    if need_ncei:
+        years = {int(cases[supercells[mesos[mi]["sc"]]["case"]]["date"][:4]) for mi, _ in need_ncei}
+        nc = ncei.load_tornadoes(years, Path(a.ncei_cache), Path(a.ncei_local) if a.ncei_local else None)
+        by_id = {int(r.EVENT_ID): r for r in nc.itertuples()} if len(nc) else {}
+        for mi, e in need_ncei:
+            r = by_id.get(e)
+            if r is None:
+                continue
             lat0, lon0 = r.BEGIN_LAT, r.BEGIN_LON
             lat1 = r.END_LAT if not pd.isna(r.END_LAT) else lat0
             lon1 = r.END_LON if not pd.isna(r.END_LON) else lon0
-            ef = str(r.TOR_F_SCALE).strip().upper() if not pd.isna(r.TOR_F_SCALE) else ""
-            t.update({
-                "t0": int(r.t0), "t1": int(r.t1),
-                "path": [[round(float(lat0), 4), round(float(lon0), 4)], [round(float(lat1), 4), round(float(lon1), 4)]],
-                "ef": ef.replace("EF", "").replace("F", "") or "U",
-                "where": f"{str(r.CZ_NAME).title()}, {str(r.STATE).title()}",
-                "len": None if pd.isna(r.TOR_LENGTH) else round(float(r.TOR_LENGTH), 2),
-                "wid": None if pd.isna(r.TOR_WIDTH) else int(r.TOR_WIDTH),
-                "inj": int(r.INJURIES_DIRECT or 0), "dth": int(r.DEATHS_DIRECT or 0),
-            })
-            if any(math.isnan(v) for p in t["path"] for v in p):
-                t["path"] = None
+            path = [[round(float(lat0), 4), round(float(lon0), 4)], [round(float(lat1), 4), round(float(lon1), 4)]]
+            if any(math.isnan(v) for p in path for v in p):
+                path = None
+            ef = str(r.TOR_F_SCALE).strip().upper().replace("EF", "").replace("F", "") if not pd.isna(r.TOR_F_SCALE) else ""
+            ef = ef if ef in {"0", "1", "2", "3", "4", "5"} else "U"
+            seg = {"event": e, "t0": int(r.t0), "t1": int(r.t1), "path": path, "ef": ef,
+                   "where": f"{str(r.CZ_NAME).title()}, {str(r.STATE).title()}",
+                   "len": None if pd.isna(r.TOR_LENGTH) else round(float(r.TOR_LENGTH), 2),
+                   "wid": None if pd.isna(r.TOR_WIDTH) else int(r.TOR_WIDTH)}
+            resolved[(mi, e)] = {"id": e, "src": "ncei", "ncei": True, "t0": seg["t0"], "t1": seg["t1"], "ef": ef,
+                                 "len": seg["len"], "wid": seg["wid"], "inj": int(r.INJURIES_DIRECT or 0),
+                                 "dth": int(r.DEATHS_DIRECT or 0), "where": seg["where"], "segs": [seg],
+                                 "partial": True}
+
+    # one entry per whole tornado; a tornado linked to several mesos is shared by them
+    tor_index = {}
+    missing = 0
+    for mi, ev, fname in pending_links:
+        e = evid(ev)
+        t = resolved.get((mi, e))
+        if t is None:
+            key = ("pending", e if e is not None else ev, fname)
+            t = {"id": e, "src": None, "ncei": False, "segs": []}
         else:
-            missing += 1
-        mesos[mi]["tor"].append(len(tornadoes))
-        tornadoes.append(t)
+            key = ("tor", t["id"])
+        if key not in tor_index:
+            tor_index[key] = len(tornadoes)
+            t = dict(t, mesos=[], linked=[])
+            tornadoes.append(t)
+            if not t["ncei"]:
+                missing += 1
+        ti = tor_index[key]
+        tor = tornadoes[ti]
+        if e is not None and e not in tor["linked"]:
+            tor["linked"].append(e)
+        if mi not in tor["mesos"]:
+            tor["mesos"].append(mi)
+        if ti not in mesos[mi]["tor"]:
+            mesos[mi]["tor"].append(ti)
+    dupes = len(pending_links) - len(tornadoes)
+    if dupes:
+        print(f"Merged {dupes} tornado link(s) that were segments of an already-linked tornado")
 
     out = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -165,7 +207,7 @@ def main() -> None:
     for p in problems:
         print("!", p)
     print(f"{len(cases)} days, {len(supercells)} supercells, {len(mesos)} mesocyclones, "
-          f"{len(tornadoes)} tornadoes ({missing} not yet in NCEI) -> {a.out}")
+          f"{len(tornadoes)} whole tornadoes from {len(pending_links)} links ({missing} not found) -> {a.out}")
 
 
 if __name__ == "__main__":
