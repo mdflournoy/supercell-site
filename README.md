@@ -1,6 +1,6 @@
 # Observed Database of Supercells
 
-A single-page dashboard of MesoTrack mesocyclone tracks and their tornadoes, rebuilt
+A single-page dashboard of supercell mesocyclone tracks and their tornadoes, rebuilt
 every night at midnight US Central by GitHub Actions and served on GitHub Pages.
 
 **What runs each night**
