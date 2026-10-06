@@ -96,6 +96,8 @@ button.ghost { background: transparent; }
 }
 .card h2 { font-size: 14px; font-weight: 620; margin: 0 0 2px; }
 .card .hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.card-head button { flex: none; }
 .chart-box { position: relative; height: 230px; }
 
 /* ---------- map ---------- */

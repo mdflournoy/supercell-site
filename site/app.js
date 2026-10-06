@@ -428,6 +428,7 @@
   [$("tStart"), $("tEnd")].forEach((el) => el.max = toInput(hi));
   $("tStart").addEventListener("change", () => setWindow(fromInput($("tStart").value), win[1]));
   $("tEnd").addEventListener("change", () => setWindow(win[0], fromInput($("tEnd").value)));
+  $("allBtn2").addEventListener("click", () => $("allBtn").click());
   $("allBtn").addEventListener("click", () => { $("daySelect").value = ""; $("yearSelect").value = ""; setWindow(lo, hi, { fit: true }); });
 
   dayStats.slice().sort((x, y) => (x.date < y.date ? 1 : -1)).forEach((d) => {
