@@ -54,16 +54,16 @@
         <div class="toggles">
           <label><input type="checkbox" id="showNon" checked> Non-tornadic mesos</label>
           <label><input type="checkbox" id="showTorM" checked> Tornadic mesos</label>
-          <label><input type="checkbox" id="showPaths" checked> Tornado paths</label>
+          <label><input type="checkbox" id="showPaths"> Tornado paths</label>
           <label><input type="checkbox" id="clipTracks" checked> Clip to window</label>
           <button id="fitBtn" style="padding:4px 10px">Zoom to tracks</button>
         </div>
       </div>
       <div id="map"></div>
       <div class="legend">
-        <span class="key"><span class="sw non"></span>Non-tornadic mesocyclone</span>
         <span class="key"><span class="sw tor"></span>Tornadic mesocyclone</span>
-        <span class="key"><span class="sw path"></span>Tornado path, all segments (width ∝ segment EF)</span>
+        <span class="key"><span class="sw non"></span>Non-tornadic mesocyclone</span>
+        <span class="key"><span class="sw path"></span>Tornado path (segment width ~ intensity)</span>
         <span class="key"><span class="dot"></span>Meso track start</span>
       </div>
     </div>
@@ -71,8 +71,6 @@
     <aside class="side">
       <div class="kpis" id="kpis"></div>
       <div class="card">
-        <h2>Tornadic vs. non-tornadic</h2>
-        <p class="hint">Share that produced at least one tornado</p>
         <div class="donuts">
           <div class="donut-row">
             <div class="donut-box"><canvas id="pieSc"></canvas><div class="donut-center" id="pieScC"></div></div>
@@ -94,30 +92,30 @@
   <section class="grid-charts">
     <div class="card">
       <h2>Mesocyclones per supercell</h2>
-      <p class="hint">Number of supercells by meso count</p>
+      <p class="hint" id="mpcHint"></p>
       <div class="chart-box"><canvas id="histMeso"></canvas></div>
     </div>
     <div class="card">
       <h2>Time from track start to first tornado</h2>
-      <p class="hint" id="ttHint">Tornadic supercells · minutes after first meso detection</p>
+      <p class="hint" id="ttHint"></p>
       <div class="chart-box"><canvas id="histTT"></canvas></div>
     </div>
     <div class="card">
       <h2>Mesocyclone lifetime</h2>
-      <p class="hint">First to last tracked scan, minutes</p>
+      <p class="hint" id="lifeHint"></p>
       <div class="chart-box"><canvas id="histLife"></canvas></div>
     </div>
   </section>
 
   <section class="grid-bottom">
     <div class="card">
-      <h2>How mesocyclones ended</h2>
-      <p class="hint">Dissipation mode from MesoTrack</p>
+      <h2>Supercell dissipation mode</h2>
+      <p class="hint">Supercell count by how the storm ended</p>
       <div class="chart-box"><canvas id="barEnd"></canvas></div>
     </div>
     <div class="card">
       <h2>Tornado ratings</h2>
-      <p class="hint">Linked tornadoes by max EF across segments</p>
+      <p class="hint">Maximum segment rating along each track</p>
       <div class="chart-box"><canvas id="barEF"></canvas></div>
     </div>
     <div class="card">

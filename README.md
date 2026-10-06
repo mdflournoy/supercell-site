@@ -109,7 +109,10 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   within tornadic supercells.
 - Histograms: mesocyclones per supercell, time from track start to first tornado, and
   mesocyclone lifetime.
-- Bar charts of how mesocyclones ended (by tornadic status) and of tornado EF ratings.
+- Bar charts of supercell dissipation mode (by tornadic status) and of tornado max-EF ratings.
+- Summary boxes also include total mesocyclone track length and total mesocyclone duration.
+- Tornado paths are off by default (toggle above the map). Hovering any track or tornado
+  widens every track and tornado belonging to that supercell.
 - A sortable table of days; click a row to jump to that day.
 - Light and dark themes (follows the system setting; the button toggles).
 

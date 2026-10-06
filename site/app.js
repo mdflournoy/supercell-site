@@ -16,6 +16,14 @@
   const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
   const efNum = (ef) => (ef === "U" || ef == null ? -1 : +ef);
   const efLabel = (ef) => (ef === "U" || ef == null ? "EFU" : "EF" + ef);
+  const kmBetween = (la1, lo1, la2, lo2) => {
+    const r = Math.PI / 180, dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(h));
+  };
+  const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  const nf = (v, d = 0) => v.toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+  const DOT = " · ";
   const nceiLink = (id) => `https://www.ncdc.noaa.gov/stormevents/eventdetails.jsp?id=${id}`;
 
   // ---------------------------------------------------------------- data
@@ -31,6 +39,8 @@
   M.forEach((m, i) => {
     m.i = i; m.t0 = m.pts[0][0]; m.t1 = m.pts[m.pts.length - 1][0];
     m.life = (m.t1 - m.t0) / 60; m.tornadic = m.tor.length > 0;
+    m.km = 0;
+    for (let k = 1; k < m.pts.length; k++) m.km += kmBetween(m.pts[k - 1][1], m.pts[k - 1][2], m.pts[k][1], m.pts[k][2]);
   });
   S.forEach((s, i) => {
     s.i = i;
@@ -40,6 +50,8 @@
     s.firstTor = starts.length ? Math.min(...starts) : null;
     s.tt = s.firstTor != null ? (s.firstTor - s.t0) / 60 : null;
     s.date = C[s.case].date;
+    const ends = s.mesos.map((mi) => M[mi].end).filter(Boolean);
+    s.end = ends.length ? ends.sort((x, y) => ends.filter((e) => e === y).length - ends.filter((e) => e === x).length)[0] : "unknown";
   });
   T.forEach((t, i) => {
     t.i = i; t.sc = M[t.mesos[0]].sc;
@@ -93,7 +105,8 @@
   L.control.scale({ imperial: true, metric: true }).addTo(map);
 
   const layer = L.layerGroup().addTo(map);
-  let scLines = {}; // supercell idx -> [polyline]
+  let scLines = {}; // supercell idx -> [meso polylines]
+  let scTors = {};  // supercell idx -> [tornado lines/halos/dots]
 
   function mesoPopup(m) {
     const s = S[m.sc];
@@ -109,7 +122,7 @@
       <table>
         <tr><td>Tracked</td><td>${fmtT(m.t0)} → ${fmtHM(m.t1)} (${dur(m.life)})</td></tr>
         <tr><td>Scans</td><td>${m.pts.length}</td></tr>
-        <tr><td>Ended</td><td>${m.end || "—"}${s.merged_into ? ` (merged into ${s.merged_into})` : ""}</td></tr>
+        <tr><td>Supercell end</td><td>${s.end}${s.merged_into ? ` (merged into ${s.merged_into})` : ""}</td></tr>
         <tr><td>Supercell</td><td>${s.mesos.length} meso${s.mesos.length > 1 ? "s" : ""}, ${dur((s.t1 - s.t0) / 60)}${s.tt != null ? `, 1st tornado +${dur(s.tt)}` : ""}</td></tr>
         ${torRows}
       </table></div>`;
@@ -117,10 +130,14 @@
 
   function highlight(si, on) {
     (scLines[si] || []).forEach((l) => l.setStyle({ weight: on ? l.options._w + 2 : l.options._w, opacity: on ? 1 : l.options._o }));
+    (scTors[si] || []).forEach((l) => {
+      if (l.options._r != null) l.setRadius(on ? l.options._r + 1.5 : l.options._r);
+      else l.setStyle({ weight: on ? l.options._w + 3 : l.options._w });
+    });
   }
 
   function drawMap(sel) {
-    layer.clearLayers(); scLines = {};
+    layer.clearLayers(); scLines = {}; scTors = {};
     const [a, b] = win, clip = $("clipTracks").checked;
     const showNon = $("showNon").checked, showTor = $("showTorM").checked, showPaths = $("showPaths").checked;
     const surface = css("--surface"), nonC = css("--nontor"), torC = css("--tor"), pathC = css("--torpath");
@@ -158,12 +175,14 @@
         // 1) all segment lines (halo, then line); 2) endpoint dots, smallest first so the
         //    wider segment's dot sits on top where two segments meet.
         const shapes = [], dots = [];
+        const scList = uniq(t.mesos.map((mi) => M[mi].sc));
+        const reg = (l) => { scList.forEach((si) => (scTors[si] ||= []).push(l)); return l; };
         for (const g of t.drawn) {
           const w = [3.5, 4.5, 5.5, 7, 8.5, 10][efNum(g.ef)] ?? 3.5;
           const same = g.path[0][0] === g.path[1][0] && g.path[0][1] === g.path[1][1];
           if (!same) {
-            L.polyline(g.path, { renderer, color: surface, weight: w + 3, opacity: 0.9, lineCap: "round", interactive: false }).addTo(layer); // halo
-            shapes.push(L.polyline(g.path, { renderer, color: pathC, weight: w, opacity: 1, lineCap: "round" }));
+            reg(L.polyline(g.path, { renderer, color: surface, weight: w + 3, opacity: 0.9, lineCap: "round", interactive: false, _w: w + 3 })).addTo(layer); // halo
+            shapes.push(reg(L.polyline(g.path, { renderer, color: pathC, weight: w, opacity: 1, lineCap: "round", _w: w })));
             dots.push([g.path[0], w], [g.path[1], w]);
           } else {
             dots.push([g.path[0], w]);
@@ -171,9 +190,10 @@
         }
         dots.sort((x, y) => x[1] - y[1]);
         for (const [ll, w] of dots) {
-          shapes.push(L.circleMarker(ll, { renderer, radius: w / 2 + 1.5, color: surface, weight: 1.75, fillColor: pathC, fillOpacity: 1 }));
+          shapes.push(reg(L.circleMarker(ll, { renderer, radius: w / 2 + 1.5, color: surface, weight: 1.75, fillColor: pathC, fillOpacity: 1, _r: w / 2 + 1.5 })));
         }
-        shapes.forEach((sh) => sh.bindTooltip(tip, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] }).bindPopup(pop, { maxWidth: 440 }).addTo(layer));
+        shapes.forEach((sh) => sh.bindTooltip(tip, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] }).bindPopup(pop, { maxWidth: 440 })
+          .on("mouseover", () => scList.forEach((si) => highlight(si, true))).on("mouseout", () => scList.forEach((si) => highlight(si, false))).addTo(layer));
       }
     }
   }
@@ -267,6 +287,7 @@
     const tts = torSc.map((s) => s.tt).filter((v) => v != null);
     const lifes = allMesos.map((m) => m.life);
     const days = new Set(scs.map((s) => s.case)).size;
+    const totKm = allMesos.reduce((n, m) => n + m.km, 0), totMin = lifes.reduce((n, v) => n + v, 0);
 
     // KPIs
     const sig = tors.filter((t) => t.ncei && efNum(t.ef) >= 2).length;
@@ -275,12 +296,14 @@
       kpi(scs.length, "Supercells", `${days} day${days === 1 ? "" : "s"} · ${torSc.length} tornadic`) +
       kpi(allMesos.length, "Mesocyclones", scs.length ? `${(allMesos.length / scs.length).toFixed(2)} per supercell` : "—") +
       kpi(tors.length, "Linked tornadoes", `${sig} rated EF2+`) +
-      kpi(tts.length ? dur(median(tts)) : "—", "Median time to 1st tornado", tts.length ? `n = ${tts.length} tornadic supercells` : "no timed tornadoes");
+      kpi(tts.length ? dur(median(tts)) : "—", "Median time to 1st tornado", tts.length ? `n = ${tts.length} tornadic supercells` : "no timed tornadoes") +
+      kpi(`${nf(totKm)} km`, "Total meso track length", allMesos.length ? `${nf(totKm * 0.621371)} mi${DOT}${nf(totKm / allMesos.length)} km per meso` : "—") +
+      kpi(`${nf(totMin / 60, totMin < 600 ? 1 : 0)} h`, "Total meso duration", allMesos.length ? `${dur(totMin / allMesos.length)} per meso` : "—");
 
     // donuts
-    donut("pieSc", torSc.length, scs.length - torSc.length, "Supercells", ["Tornadic", "Non-tornadic"]);
+    donut("pieSc", torSc.length, scs.length - torSc.length, "Supercell count", ["Tornadic", "Non-tornadic"]);
     const tm = allMesos.filter((m) => m.tornadic).length;
-    donut("pieMeso", tm, allMesos.length - tm, "Mesocyclones (all supercells)", ["Tornadic", "Non-tornadic"]);
+    donut("pieMeso", tm, allMesos.length - tm, "Mesocyclone count", ["Tornadic", "Non-tornadic"]);
     const tmt = torScMesos.filter((m) => m.tornadic).length;
     donut("pieMesoTs", tmt, torScMesos.length - tmt, "Mesocyclones in tornadic supercells", ["Tornadic", "Non-tornadic"]);
 
@@ -289,6 +312,7 @@
     const mpc = Array.from({ length: maxN }, (_, k) => counts.filter((c) => c === k + 1).length);
     const o1 = baseOpts("Mesocyclones in supercell", "Supercells");
     o1.plugins.tooltip.callbacks = { title: (c) => `${c[0].label} meso${c[0].label === "1" ? "" : "s"}`, label: (c) => ` ${c.raw} supercell${c.raw === 1 ? "" : "s"} (${pct(c.raw, scs.length)}%)` };
+    $("mpcHint").textContent = counts.length ? `Mean: ${nf(mean(counts), 2)}${DOT}Max: ${Math.max(...counts)}` : "No supercells in window";
     upsert("histMeso", "bar", { labels: mpc.map((_, k) => String(k + 1)), datasets: [barDs(mpc, css("--nontor"), "Supercells")] }, o1);
 
     // histogram: time to first tornado
@@ -296,24 +320,26 @@
     const o2 = baseOpts("Minutes after track start", "Supercells");
     o2.plugins.tooltip.callbacks = { title: (c) => `${c[0].label} min`, label: (c) => ` ${c.raw} supercell${c.raw === 1 ? "" : "s"}` };
     upsert("histTT", "bar", { labels: ttB.labels, datasets: [barDs(ttB.counts, css("--tor"), "Tornadic supercells")] }, o2);
-    const neg = tts.filter((v) => v < 0).length;
-    $("ttHint").textContent = `Tornadic supercells · minutes after first meso detection` + (tts.length ? ` · median ${dur(median(tts))}` : "") + (neg ? ` · ${neg} tornado before tracking began` : "");
+    $("ttHint").textContent = tts.length ? `Min: ${dur(Math.min(...tts))}${DOT}Mean: ${dur(mean(tts))}${DOT}Max: ${dur(Math.max(...tts))}` : "No tornadic supercells in window";
 
     // histogram: meso lifetime
     const lB = hist(lifes, niceBin(lifes), { minEdge: 0 });
     const o3 = baseOpts("Minutes", "Mesocyclones");
     o3.plugins.tooltip.callbacks = { title: (c) => `${c[0].label} min`, label: (c) => ` ${c.raw} meso${c.raw === 1 ? "" : "s"}` };
+    $("lifeHint").textContent = lifes.length ? `Min: ${dur(Math.min(...lifes))}${DOT}Mean: ${dur(mean(lifes))}${DOT}Max: ${dur(Math.max(...lifes))}` : "No mesocyclones in window";
     upsert("histLife", "bar", { labels: lB.labels, datasets: [barDs(lB.counts, css("--nontor"), "Mesocyclones")] }, o3);
 
-    // ending modes, tornadic vs not (2 series)
-    const modes = [...new Set(allMesos.map((m) => m.end || "unknown"))].sort();
-    const o4 = baseOpts("", "Mesocyclones");
+    // supercell dissipation mode, tornadic vs not (2 series), fixed order
+    const ORDER = ["dissipate", "merge-sup", "merge-qlcs", "upscale", "unknown"];
+    const modes = [...ORDER, ...uniq(scs.map((x) => x.end)).filter((md) => !ORDER.includes(md)).sort()];
+    const o4 = baseOpts("", "Supercells");
+    o4.scales.x.ticks.autoSkip = false;
     o4.plugins.legend.display = true; o4.plugins.legend.position = "top"; o4.plugins.legend.align = "end";
     upsert("barEnd", "bar", {
       labels: modes,
       datasets: [
-        barDs(modes.map((md) => allMesos.filter((m) => (m.end || "unknown") === md && m.tornadic).length), css("--tor"), "Tornadic"),
-        barDs(modes.map((md) => allMesos.filter((m) => (m.end || "unknown") === md && !m.tornadic).length), css("--nontor"), "Non-tornadic"),
+        barDs(modes.map((md) => scs.filter((x) => x.end === md && x.tornadic).length), css("--tor"), "Tornadic"),
+        barDs(modes.map((md) => scs.filter((x) => x.end === md && !x.tornadic).length), css("--nontor"), "Non-tornadic"),
       ],
     }, o4);
 
