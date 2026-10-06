@@ -155,15 +155,23 @@
             <tr><td>Path</td><td>${t.len ?? "—"} mi total · max width ${t.wid ?? "—"} yd</td></tr><tr><td>Casualties</td><td>${t.inj} injuries, ${t.dth} deaths</td></tr>
             ${t.partial ? `<tr><td>Note</td><td>From NCEI only; other segments may exist</td></tr>` : ""}
             </table><table style="margin-top:8px">${segRows}</table></div>`;
-        const shapes = [];
+        // 1) all segment lines (halo, then line); 2) endpoint dots, smallest first so the
+        //    wider segment's dot sits on top where two segments meet.
+        const shapes = [], dots = [];
         for (const g of t.drawn) {
           const w = [3.5, 4.5, 5.5, 7, 8.5, 10][efNum(g.ef)] ?? 3.5;
           const same = g.path[0][0] === g.path[1][0] && g.path[0][1] === g.path[1][1];
-          if (same) shapes.push(L.circleMarker(g.path[0], { renderer, radius: w / 1.4 + 1, color: surface, weight: 2, fillColor: pathC, fillOpacity: 1 }));
-          else {
+          if (!same) {
             L.polyline(g.path, { renderer, color: surface, weight: w + 3, opacity: 0.9, lineCap: "round", interactive: false }).addTo(layer); // halo
             shapes.push(L.polyline(g.path, { renderer, color: pathC, weight: w, opacity: 1, lineCap: "round" }));
+            dots.push([g.path[0], w], [g.path[1], w]);
+          } else {
+            dots.push([g.path[0], w]);
           }
+        }
+        dots.sort((x, y) => x[1] - y[1]);
+        for (const [ll, w] of dots) {
+          shapes.push(L.circleMarker(ll, { renderer, radius: w / 2 + 1.5, color: surface, weight: 1.75, fillColor: pathC, fillOpacity: 1 }));
         }
         shapes.forEach((sh) => sh.bindTooltip(tip, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] }).bindPopup(pop, { maxWidth: 440 }).addTo(layer));
       }
