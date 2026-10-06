@@ -360,7 +360,7 @@
       kpi(scs.length, "Supercells", `${days} day${days === 1 ? "" : "s"} · ${torSc.length} tornadic`) +
       kpi(allMesos.length, "Mesocyclones", scs.length ? `${(allMesos.length / scs.length).toFixed(2)} per supercell` : "—") +
       kpi(tors.length, "Linked tornadoes", `${sig} rated EF2+`) +
-      kpi(tts.length ? dur(median(tts)) : "—", "Median time to 1st tornado", tts.length ? `${tts.length} supercell${tts.length === 1 ? "" : "s"}` : "no timed tornadoes") +
+      kpi(tts.length ? dur(median(tts)) : "—", "Median time to 1st tornado", tts.length ? `${tts.length} tornadic supercell${tts.length === 1 ? "" : "s"}` : "no timed tornadoes") +
       kpi(`${nf(totKm)} km`, "Total meso track length", allMesos.length ? `${nf(totKm * 0.621371)} mi${DOT}${nf(totKm / allMesos.length)} km per meso` : "—") +
       kpi(`${nf(totMin / 60, totMin < 600 ? 1 : 0)} h`, "Total meso duration", allMesos.length ? `${dur(totMin / allMesos.length)} per meso` : "—");
 
