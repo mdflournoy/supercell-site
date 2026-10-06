@@ -148,6 +148,18 @@
   }
   L.control.scale({ imperial: true, metric: true }).addTo(map);
 
+  // Square marker drawn on the canvas renderer (used for meso track starts).
+  L.Canvas.include({
+    _updateSquare(layer) {
+      if (!this._drawing || layer._empty()) return;
+      const p = layer._point, ctx = this._ctx, r = Math.max(Math.round(layer._radius), 1);
+      ctx.beginPath();
+      ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
+      this._fillStroke(ctx, layer);
+    },
+  });
+  const SquareMarker = L.CircleMarker.extend({ _updatePath() { this._renderer._updateSquare(this); } });
+
   const layer = L.layerGroup().addTo(map);
   let scLines = {}; // supercell idx -> [meso polylines]
   let scTors = {};  // supercell idx -> [tornado lines/halos/dots]
@@ -204,7 +216,7 @@
       (scLines[m.sc] ||= []).push(line);
       if (pts[0][0] === m.t0) starts.push([latlngs[0], m.tornadic ? torC : nonC]);
     }
-    for (const [ll, c] of starts) L.circleMarker(ll, { renderer, radius: 3.5, color: c, weight: 2, fillColor: surface, fillOpacity: 1, interactive: false }).addTo(layer);
+    for (const [ll, c] of starts) new SquareMarker(ll, { renderer, radius: 3.5, color: c, weight: 2, fillColor: surface, fillOpacity: 1, interactive: false }).addTo(layer);
 
     if (showPaths) {
       for (const ti of sel.paths) {

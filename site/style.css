@@ -113,7 +113,7 @@ button.ghost { background: transparent; }
 .legend .sw.tor { border-color: var(--tor); }
 .legend .sw.non { border-color: var(--nontor); }
 .legend .sw.path { border-top-width: 5px; border-color: var(--torpath); }
-.legend .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-2); }
+.legend .dot { width: 8px; height: 8px; border-radius: 1px; background: var(--surface); border: 2px solid var(--ink-2); }
 
 .leaflet-container { font: inherit; }
 .leaflet-tooltip.mt-tip, .leaflet-popup-content-wrapper {
