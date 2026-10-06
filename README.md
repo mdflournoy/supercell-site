@@ -6,7 +6,7 @@ every night at midnight US Central by GitHub Actions and served on GitHub Pages.
 **What runs each night**
 
 1. `scripts/fetch_drive.py` downloads every `.csv` in the Google Drive folder (subfolders included).
-2. `scripts/build_data.py` parses each MesoTrack file and resolves each linked NCEI event ID
+2. `scripts/build_data.py` parses each event file and resolves each linked NCEI event ID
    to the **whole tornado** using the 1950–2024 tornado database CSV in the same folder
    (any CSV with `oneTorID` and `stormEventsReportID` columns): every segment sharing the
    linked segment's `oneTorID` is plotted, and totals (length, max EF, casualties, start/end)
