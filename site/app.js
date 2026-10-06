@@ -1,4 +1,4 @@
-/* Supercell Tracks dashboard — reads data.json (built nightly by scripts/build_data.py). */
+/* Observed Database of Supercells dashboard — reads data.json (built nightly by scripts/build_data.py). */
 (async function () {
   "use strict";
 
@@ -208,7 +208,7 @@
   // ---------------------------------------------------------------- charts
   Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
   Chart.defaults.font.size = 12;
-  Chart.defaults.animation = { duration: 250 };
+  Chart.defaults.animation.duration = 250;
   const charts = {};
 
   function baseOpts(xTitle, yTitle) {
@@ -227,6 +227,26 @@
     };
   }
   const barDs = (data, color, label) => ({ label, data, backgroundColor: color, hoverBackgroundColor: color, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: "start", categoryPercentage: 0.92, barPercentage: 0.94 });
+
+  // Hover window for bar charts: x value, count, and % of everything in the chart.
+  // opts.withinColumn adds % of that bar's column (all series at that x value).
+  const pctStr = (v, tot) => (tot ? `${(Math.round((1000 * v) / tot) / 10).toFixed(1)}%` : "—");
+  function barTip(titleFn, noun, plural, { withinColumn = false } = {}) {
+    return {
+      title: (items) => titleFn(items[0].label),
+      label: (c) => {
+        const sets = c.chart.data.datasets;
+        const all = sets.reduce((n, ds) => n + ds.data.reduce((x, y) => x + y, 0), 0);
+        const name = sets.length > 1 ? `${c.dataset.label}: ` : "";
+        let out = ` ${name}${c.raw} ${c.raw === 1 ? noun : plural} · ${pctStr(c.raw, all)} of all`;
+        if (withinColumn) {
+          const col = sets.reduce((n, ds) => n + (ds.data[c.dataIndex] || 0), 0);
+          out += ` · ${pctStr(c.raw, col)} of ${c.label}`;
+        }
+        return out;
+      },
+    };
+  }
 
   function upsert(id, type, data, options) {
     if (charts[id]) { charts[id].data = data; charts[id].options = options; charts[id].update(); return; }
@@ -311,21 +331,21 @@
     const counts = scs.map((s) => s.mesos.length), maxN = Math.max(1, ...counts);
     const mpc = Array.from({ length: maxN }, (_, k) => counts.filter((c) => c === k + 1).length);
     const o1 = baseOpts("Mesocyclones in supercell", "Supercells");
-    o1.plugins.tooltip.callbacks = { title: (c) => `${c[0].label} meso${c[0].label === "1" ? "" : "s"}`, label: (c) => ` ${c.raw} supercell${c.raw === 1 ? "" : "s"} (${pct(c.raw, scs.length)}%)` };
+    o1.plugins.tooltip.callbacks = barTip((x) => `${x} meso${x === "1" ? "" : "s"} per supercell`, "supercell", "supercells");
     $("mpcHint").textContent = counts.length ? `Mean: ${nf(mean(counts), 2)}${DOT}Max: ${Math.max(...counts)}` : "No supercells in window";
     upsert("histMeso", "bar", { labels: mpc.map((_, k) => String(k + 1)), datasets: [barDs(mpc, css("--nontor"), "Supercells")] }, o1);
 
     // histogram: time to first tornado
     const ttB = hist(tts, niceBin(tts), { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
     const o2 = baseOpts("Minutes after track start", "Supercells");
-    o2.plugins.tooltip.callbacks = { title: (c) => `${c[0].label} min`, label: (c) => ` ${c.raw} supercell${c.raw === 1 ? "" : "s"}` };
+    o2.plugins.tooltip.callbacks = barTip((x) => `${x} min to first tornado`, "supercell", "supercells");
     upsert("histTT", "bar", { labels: ttB.labels, datasets: [barDs(ttB.counts, css("--tor"), "Tornadic supercells")] }, o2);
     $("ttHint").textContent = tts.length ? `Min: ${dur(Math.min(...tts))}${DOT}Mean: ${dur(mean(tts))}${DOT}Max: ${dur(Math.max(...tts))}` : "No tornadic supercells in window";
 
     // histogram: meso lifetime
     const lB = hist(lifes, niceBin(lifes), { minEdge: 0 });
     const o3 = baseOpts("Minutes", "Mesocyclones");
-    o3.plugins.tooltip.callbacks = { title: (c) => `${c[0].label} min`, label: (c) => ` ${c.raw} meso${c.raw === 1 ? "" : "s"}` };
+    o3.plugins.tooltip.callbacks = barTip((x) => `${x} min lifetime`, "mesocyclone", "mesocyclones");
     $("lifeHint").textContent = lifes.length ? `Min: ${dur(Math.min(...lifes))}${DOT}Mean: ${dur(mean(lifes))}${DOT}Max: ${dur(Math.max(...lifes))}` : "No mesocyclones in window";
     upsert("histLife", "bar", { labels: lB.labels, datasets: [barDs(lB.counts, css("--nontor"), "Mesocyclones")] }, o3);
 
@@ -334,6 +354,7 @@
     const modes = [...ORDER, ...uniq(scs.map((x) => x.end)).filter((md) => !ORDER.includes(md)).sort()];
     const o4 = baseOpts("", "Supercells");
     o4.scales.x.ticks.autoSkip = false;
+    o4.plugins.tooltip.callbacks = barTip((x) => `Dissipation mode: ${x}`, "supercell", "supercells", { withinColumn: true });
     o4.plugins.legend.display = true; o4.plugins.legend.position = "top"; o4.plugins.legend.align = "end";
     upsert("barEnd", "bar", {
       labels: modes,
@@ -351,7 +372,7 @@
     if (pending) { efLabels.push("Pending"); efCounts.push(pending); }
     const o5 = baseOpts("", "Tornadoes");
     o5.scales.x.ticks.autoSkip = false;
-    o5.plugins.tooltip.callbacks = { label: (c) => ` ${c.raw} tornado${c.raw === 1 ? "" : "es"}` };
+    o5.plugins.tooltip.callbacks = barTip((x) => (x === "Pending" ? "Not yet in a tornado record" : `${x} (max segment rating)`), "tornado", "tornadoes");
     upsert("barEF", "bar", { labels: efLabels, datasets: [barDs(efCounts, efLabels.map((l) => (l === "Pending" ? css("--muted") : css("--tor"))), "Tornadoes")] }, o5);
 
     // window note
