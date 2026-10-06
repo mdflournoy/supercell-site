@@ -238,7 +238,7 @@
         const sets = c.chart.data.datasets;
         const all = sets.reduce((n, ds) => n + ds.data.reduce((x, y) => x + y, 0), 0);
         const name = sets.length > 1 ? `${c.dataset.label}: ` : "";
-        let out = ` ${name}${c.raw} ${c.raw === 1 ? noun : plural} · ${pctStr(c.raw, all)} of all`;
+        let out = ` ${name}${c.raw} ${c.raw === 1 ? noun : plural} · ${pctStr(c.raw, all)}${withinColumn ? " of all" : ""}`;
         if (withinColumn) {
           const col = sets.reduce((n, ds) => n + (ds.data[c.dataIndex] || 0), 0);
           out += ` · ${pctStr(c.raw, col)} of ${c.label}`;
