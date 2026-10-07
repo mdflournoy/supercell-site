@@ -387,8 +387,8 @@
       upsert(id, "bar", { labels: cnt.map((_, k) => String(k + 1)), datasets: [barDs(cnt, css("--tor"), plural)] }, o);
       $(hintId).textContent = vals.length ? `Mean: ${nf(mean(vals), 2)}${DOT}Max: ${Math.max(...vals)}` : `No tornadic ${plural} in window`;
     };
-    countHist("histTPS", "tpsHint", scs.map((x) => x.tors.length), "Tornadoes in supercell", "Tornadic supercells", "supercell", "supercells", "supercell");
-    countHist("histTPM", "tpmHint", allMesos.map((m) => m.tor.length), "Tornadoes in mesocyclone", "Tornadic mesocyclones", "mesocyclone", "mesocyclones", "mesocyclone");
+    countHist("histTPS", "tpsHint", scs.map((x) => x.tors.length), "Tornado count", "Tornadic supercells", "supercell", "supercells", "supercell");
+    countHist("histTPM", "tpmHint", allMesos.map((m) => m.tor.length), "Tornado count", "Tornadic mesocyclones", "mesocyclone", "mesocyclones", "mesocyclone");
 
     // histogram: time to first tornado
     const ttB = hist(tts, niceBin(tts), { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
