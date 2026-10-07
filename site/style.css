@@ -89,6 +89,7 @@ button.ghost { background: transparent; }
 /* ---------- layout ---------- */
 .grid-main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: stretch; }
 .grid-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.grid-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
 .grid-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; margin-top: 16px; }
 .card {
   background: var(--surface); border: 1px solid var(--ring); border-radius: 12px;
@@ -178,7 +179,7 @@ footer a { color: var(--ink-2); }
   .wrap { padding: 0 16px 32px; }
   .filters { grid-template-columns: 1fr; }
   .presets { justify-content: flex-start; }
-  .side, .grid-charts, .grid-bottom { grid-template-columns: 1fr; }
+  .side, .grid-charts, .grid-bottom, .grid-pair { grid-template-columns: 1fr; }
   .map-card { min-height: 480px; }
   #map { min-height: 400px; }
 }

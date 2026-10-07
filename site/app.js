@@ -376,6 +376,20 @@
     $("mpcHint").textContent = counts.length ? `Mean: ${nf(mean(counts), 2)}${DOT}Max: ${Math.max(...counts)}` : "No supercells in window";
     upsert("histMeso", "bar", { labels: mpc.map((_, k) => String(k + 1)), datasets: [barDs(mpc, css("--nontor"), "Supercells")] }, o1);
 
+    // histograms: tornadoes per supercell / per mesocyclone (integer bins from 0; 0 = nontornadic)
+    const countHist = (id, hintId, vals, xTitle, yTitle, noun, plural, unit) => {
+      const maxN = Math.max(0, ...vals);
+      const cnt = Array.from({ length: maxN + 1 }, (_, k) => vals.filter((v) => v === k).length);
+      const o = baseOpts(xTitle, yTitle);
+      o.scales.x.ticks.autoSkip = false;
+      o.plugins.tooltip.callbacks = barTip((x) => `${x} tornado${x === "1" ? "" : "es"} per ${unit}`, noun, plural);
+      const colors = cnt.map((_, k) => (k === 0 ? css("--nontor") : css("--tor")));
+      upsert(id, "bar", { labels: cnt.map((_, k) => String(k)), datasets: [barDs(cnt, colors, plural)] }, o);
+      $(hintId).textContent = vals.length ? `Mean: ${nf(mean(vals), 2)}${DOT}Max: ${maxN}` : `No ${plural} in window`;
+    };
+    countHist("histTPS", "tpsHint", scs.map((x) => x.tors.length), "Tornadoes in supercell", "Supercells", "supercell", "supercells", "supercell");
+    countHist("histTPM", "tpmHint", allMesos.map((m) => m.tor.length), "Tornadoes in mesocyclone", "Mesocyclones", "mesocyclone", "mesocyclones", "mesocyclone");
+
     // histogram: time to first tornado
     const ttB = hist(tts, niceBin(tts), { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
     const o2 = baseOpts("Minutes after track start", "Supercells");

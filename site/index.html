@@ -103,9 +103,9 @@
       <div class="chart-box"><canvas id="histMeso"></canvas></div>
     </div>
     <div class="card">
-      <h2>Time from track start to first tornado</h2>
-      <p class="hint" id="ttHint"></p>
-      <div class="chart-box"><canvas id="histTT"></canvas></div>
+      <h2>Supercell dissipation mode</h2>
+      <p class="hint">Supercell count by how the storm ended</p>
+      <div class="chart-box"><canvas id="barEnd"></canvas></div>
     </div>
     <div class="card">
       <h2>Mesocyclone lifetime</h2>
@@ -116,14 +116,14 @@
 
   <section class="grid-bottom">
     <div class="card">
-      <h2>Supercell dissipation mode</h2>
-      <p class="hint">Supercell count by how the storm ended</p>
-      <div class="chart-box"><canvas id="barEnd"></canvas></div>
-    </div>
-    <div class="card">
       <h2>Tornado ratings</h2>
       <p class="hint">Maximum segment rating along each track</p>
       <div class="chart-box"><canvas id="barEF"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Time from track start to first tornado</h2>
+      <p class="hint" id="ttHint"></p>
+      <div class="chart-box"><canvas id="histTT"></canvas></div>
     </div>
     <div class="card">
       <div class="card-head">
@@ -142,6 +142,19 @@
           <tbody id="dayRows"></tbody>
         </table>
       </div>
+    </div>
+  </section>
+
+  <section class="grid-pair">
+    <div class="card">
+      <h2>Tornadoes per supercell</h2>
+      <p class="hint" id="tpsHint"></p>
+      <div class="chart-box"><canvas id="histTPS"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Tornadoes per mesocyclone</h2>
+      <p class="hint" id="tpmHint"></p>
+      <div class="chart-box"><canvas id="histTPM"></canvas></div>
     </div>
   </section>
 
