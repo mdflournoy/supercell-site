@@ -157,9 +157,18 @@
       <div class="chart-box"><canvas id="histTPM"></canvas></div>
     </div>
     <div class="card">
-      <h2>Tornado order by intensity</h2>
-      <p class="hint">Where each tornado fell in its supercell's sequence of tornadoes</p>
+      <div class="card-head">
+        <div>
+          <h2>Tornado chronology</h2>
+          <p class="hint" id="chronoHint"></p>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Chronology view">
+          <button role="tab" id="tabIntensity" aria-selected="true">Intensity</button>
+          <button role="tab" id="tabOrder" aria-selected="false">Order</button>
+        </div>
+      </div>
       <div class="order-grid" id="orderGrid"></div>
+      <div class="order-grid by-order" id="orderGrid2" hidden></div>
       <div class="order-legend" id="orderLegend"></div>
     </div>
   </section>

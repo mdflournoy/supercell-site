@@ -342,16 +342,45 @@
     tipEl.style.opacity = 1;
   }
 
-  // ---------------------------------------------------------------- tornado order by intensity
+  // ---------------------------------------------------------------- tornado chronology
+  // Intensity tab: one donut per EF rating, split by order within the supercell.
+  // Order tab: one donut per order position, split by EF rating. Same counts, transposed.
   const ORD = ["Only", "1st", "2nd", "3rd", "4th", "5th+"];
   const ORD_VARS = ["--ord-only", "--ord-1", "--ord-2", "--ord-3", "--ord-4", "--ord-5"];
   const EF_BINS = ["U", "0", "1", "2", "3", "4", "5"];
-  $("orderGrid").innerHTML = ["0", "1", "2", "3", "4", "5", "U"].map((e) => `
-    <div class="order-cell ef${e}">
-      <div class="order-donut"><canvas id="ord-${e}"></canvas><div class="order-center">${efLabel(e)}</div></div>
-      <div class="order-n" id="ordn-${e}"></div>
-    </div>`).join("");
+  const EF_VARS = ["--ef-u", "--ef-0", "--ef-1", "--ef-2", "--ef-3", "--ef-4", "--ef-5"];
+  const EF_SHOW = ["0", "1", "2", "3", "4", "5", "U"]; // grid order for the Intensity tab
+  let chronoView = "intensity";
+  const cell = (id, label, cls = "") => `
+    <div class="order-cell ${cls}">
+      <div class="order-donut"><canvas id="${id}"></canvas><div class="order-center">${label}</div></div>
+      <div class="order-n" id="${id}-n"></div>
+    </div>`;
+  $("orderGrid").innerHTML = EF_SHOW.map((e) => cell(`ord-${e}`, efLabel(e), `ef${e}`)).join("");
+  $("orderGrid2").innerHTML = ORD.map((o, k) => cell(`ordp-${k}`, o)).join("");
+  let lastChronoScs = [];
+
+  function smallDonut(id, title, labels, data, colors) {
+    const n = data.reduce((a, b) => a + b, 0), surface = css("--surface");
+    $(id + "-n").textContent = `n = ${n}`;
+    upsert(id, "doughnut", {
+      labels,
+      datasets: [{ data: n ? data : [1], backgroundColor: n ? colors : [css("--grid")], borderColor: surface, borderWidth: n ? 1.5 : 0, hoverOffset: 2 }],
+    }, {
+      responsive: true, maintainAspectRatio: false, cutout: "62%", animation: { duration: 250 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false, external: n ? floatingTip : () => {},
+          filter: (c) => c.raw > 0,
+          callbacks: { title: () => title, label: (c) => `${c.label}: ${c.raw} · ${pctStr(c.raw, n)}` },
+        },
+      },
+    });
+  }
+
   function renderOrderDonuts(scs) {
+    lastChronoScs = scs;
     const counts = Object.fromEntries(EF_BINS.map((e) => [e, Array(ORD.length).fill(0)]));
     for (const s of scs) {
       // whole tornadoes with a known start time, in the order they began
@@ -361,30 +390,30 @@
         counts[e][seq.length === 1 ? 0 : Math.min(k + 1, ORD.length - 1)]++;
       });
     }
-    const colors = ORD_VARS.map(css), surface = css("--surface"), empty = css("--grid");
-    for (const e of EF_BINS) {
-      const data = counts[e], n = data.reduce((a, b) => a + b, 0);
-      $("ordn-" + e).textContent = `n = ${n}`;
-      upsert("ord-" + e, "doughnut", {
-        labels: ORD,
-        datasets: [{ data: n ? data : [1], backgroundColor: n ? colors : [empty], borderColor: surface, borderWidth: n ? 1.5 : 0, hoverOffset: 2 }],
-      }, {
-        responsive: true, maintainAspectRatio: false, cutout: "62%", animation: { duration: 250 },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            enabled: false, external: n ? floatingTip : () => {},
-            filter: (c) => c.raw > 0,
-            callbacks: {
-              title: () => `${efLabel(e)} tornadoes`,
-              label: (c) => `${c.label}: ${c.raw} · ${pctStr(c.raw, n)}`,
-            },
-          },
-        },
-      });
+    const ordColors = ORD_VARS.map(css), efColors = EF_VARS.map(css);
+    const byIntensity = chronoView === "intensity";
+    $("orderGrid").hidden = !byIntensity;
+    $("orderGrid2").hidden = byIntensity;
+    if (byIntensity) {
+      for (const e of EF_BINS) smallDonut("ord-" + e, `${efLabel(e)} tornadoes`, ORD, counts[e], ordColors);
+      $("chronoHint").textContent = "Where each tornado fell in its supercell's sequence of tornadoes, by rating";
+      $("orderLegend").innerHTML = ORD.map((o, k) => `<span><i style="background:${ordColors[k]}"></i>${o === "Only" ? "Only tornado" : o}</span>`).join("");
+    } else {
+      ORD.forEach((o, k) => smallDonut("ordp-" + k, o === "Only" ? "Only tornado in supercell" : `${o} tornado in supercell`,
+        EF_BINS.map(efLabel), EF_BINS.map((e) => counts[e][k]), efColors));
+      $("chronoHint").textContent = "Ratings of the tornadoes at each position in their supercell's sequence";
+      $("orderLegend").innerHTML = EF_BINS.map((e, k) => `<span><i style="background:${efColors[k]}"></i>${efLabel(e)}</span>`).join("");
     }
-    $("orderLegend").innerHTML = ORD.map((o, k) => `<span><i style="background:${colors[k]}"></i>${o === "Only" ? "Only tornado" : o}</span>`).join("");
   }
+  const setChronoView = (v) => {
+    chronoView = v;
+    $("tabIntensity").setAttribute("aria-selected", v === "intensity");
+    $("tabOrder").setAttribute("aria-selected", v === "order");
+    tipEl.style.opacity = 0;
+    renderOrderDonuts(lastChronoScs);
+  };
+  $("tabIntensity").addEventListener("click", () => setChronoView("intensity"));
+  $("tabOrder").addEventListener("click", () => setChronoView("order"));
 
   // ---------------------------------------------------------------- selection + render
   function select() {
