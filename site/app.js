@@ -326,6 +326,50 @@
       <div class="row" style="color:var(--muted)"><span>Total</span><span>${total}</span></div>`;
   }
 
+  // ---------------------------------------------------------------- tornado order by intensity
+  const ORD = ["Only", "1st", "2nd", "3rd", "4th", "5th+"];
+  const ORD_VARS = ["--ord-only", "--ord-1", "--ord-2", "--ord-3", "--ord-4", "--ord-5"];
+  const EF_BINS = ["U", "0", "1", "2", "3", "4", "5"];
+  $("orderGrid").innerHTML = EF_BINS.map((e) => `
+    <div class="order-cell">
+      <div class="order-donut"><canvas id="ord-${e}"></canvas><div class="order-center">${efLabel(e)}</div></div>
+      <div class="order-n" id="ordn-${e}"></div>
+    </div>`).join("");
+  function renderOrderDonuts(scs) {
+    const counts = Object.fromEntries(EF_BINS.map((e) => [e, Array(ORD.length).fill(0)]));
+    for (const s of scs) {
+      // whole tornadoes with a known start time, in the order they began
+      const seq = s.tors.map((ti) => T[ti]).filter((t) => t.ncei && t.t0 != null).sort((a, b) => a.t0 - b.t0);
+      seq.forEach((t, k) => {
+        const e = EF_BINS.includes(String(t.ef)) ? String(t.ef) : "U";
+        counts[e][seq.length === 1 ? 0 : Math.min(k + 1, ORD.length - 1)]++;
+      });
+    }
+    const colors = ORD_VARS.map(css), surface = css("--surface"), empty = css("--grid");
+    for (const e of EF_BINS) {
+      const data = counts[e], n = data.reduce((a, b) => a + b, 0);
+      $("ordn-" + e).textContent = `n = ${n}`;
+      upsert("ord-" + e, "doughnut", {
+        labels: ORD,
+        datasets: [{ data: n ? data : [1], backgroundColor: n ? colors : [empty], borderColor: surface, borderWidth: n ? 1.5 : 0, hoverOffset: 2 }],
+      }, {
+        responsive: true, maintainAspectRatio: false, cutout: "62%", animation: { duration: 250 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: !!n, backgroundColor: surface, titleColor: css("--ink"), bodyColor: css("--ink-2"), borderColor: css("--axis"), borderWidth: 1, cornerRadius: 8, padding: 8,
+            filter: (c) => c.raw > 0,
+            callbacks: {
+              title: () => `${efLabel(e)} tornadoes`,
+              label: (c) => ` ${c.label === "Only" ? "Only tornado" : c.label + " tornado"}: ${c.raw} · ${pctStr(c.raw, n)}`,
+            },
+          },
+        },
+      });
+    }
+    $("orderLegend").innerHTML = ORD.map((o, k) => `<span><i style="background:${colors[k]}"></i>${o === "Only" ? "Only tornado" : o}</span>`).join("");
+  }
+
   // ---------------------------------------------------------------- selection + render
   function select() {
     const [a, b] = win;
@@ -389,6 +433,9 @@
     };
     countHist("histTPS", "tpsHint", scs.map((x) => x.tors.length), "Tornado count", "Tornadic supercells", "supercell", "supercells", "supercell");
     countHist("histTPM", "tpmHint", allMesos.map((m) => m.tor.length), "Tornado count", "Tornadic mesocyclones", "mesocyclone", "mesocyclones", "mesocyclone");
+
+    // donuts: order of each tornado within its supercell, one donut per EF rating
+    renderOrderDonuts(scs);
 
     // histogram: time to first tornado
     const ttB = hist(tts, niceBin(tts), { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
