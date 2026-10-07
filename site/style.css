@@ -9,7 +9,8 @@
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --ring: rgba(11, 11, 11, 0.10);
-  --nontor: #2a78d6;   /* nontornadic (categorical slot 1) */
+  --nontor: #2a78d6;
+  --non-before: #86b6ef; --non-between: #2a78d6; --non-after: #104281;   /* nontornadic (categorical slot 1) */
   --tor: #e34948;      /* tornadic (categorical slot 8) */
   --torpath: #0b0b0b;  /* tornado damage path: heavy ink line */
   --accent: #2a78d6;
@@ -23,7 +24,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
     --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
-    --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5;
+    --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
     --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
     --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
     --shadow: none;
@@ -34,7 +35,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
   --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
-  --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5;
+  --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
     --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
     --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
   --shadow: none;
@@ -236,3 +237,5 @@ footer a { color: var(--ink-2); }
 .tabs button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; font-size: 12.5px; color: var(--ink-2); }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
 .tabs button:hover { background: var(--surface); }
+
+.donut-text .row.sub { padding-left: 15px; font-size: 12px; }

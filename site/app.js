@@ -354,6 +354,28 @@
       <div class="row" style="color:var(--muted)"><span>Total</span><span>${total}</span></div>`;
   }
 
+  // Donut with the nontornadic part split into sub-slices (e.g. before / between / after).
+  function donutSplit(id, tor, parts, title) {
+    const torC = css("--tor"), surface = css("--surface");
+    const non = parts.reduce((n, p) => n + p.value, 0), total = tor + non;
+    const labels = ["Tornadic", ...parts.map((p) => `Nontornadic, ${p.label}`)];
+    const data = [tor, ...parts.map((p) => p.value)], colors = [torC, ...parts.map((p) => css(p.color))];
+    upsert(id, "doughnut", {
+      labels,
+      datasets: [{ data: total ? data : [1], backgroundColor: total ? colors : [css("--grid")], borderColor: surface, borderWidth: 2, hoverOffset: 3 }],
+    }, {
+      responsive: true, maintainAspectRatio: false, cutout: "66%",
+      plugins: { legend: { display: false }, tooltip: { enabled: false, external: total ? floatingTip : () => {}, filter: (c) => c.raw > 0,
+        callbacks: { title: () => title, label: (c) => `${c.label}: ${c.raw} · ${pctStr(c.raw, total)}` } } },
+    });
+    $(id + "C").innerHTML = total ? `<div><b>${pct(tor, total)}%</b><span>tornadic</span></div>` : `<div><span>none</span></div>`;
+    $(id + "T").innerHTML = `<h3>${title}</h3>
+      <div class="row"><span><i style="background:${torC}"></i>Tornadic</span><b>${tor}</b></div>
+      <div class="row"><span><i style="background:transparent"></i>Nontornadic</span><b>${non}</b></div>
+      ${parts.map((p) => `<div class="row sub"><span><i style="background:${css(p.color)}"></i>${p.label}</span><span>${p.value}</span></div>`).join("")}
+      <div class="row" style="color:var(--muted)"><span>Total</span><span>${total}</span></div>`;
+  }
+
   // Floating HTML tooltip drawn above the whole page (not clipped by small canvases).
   const tipEl = document.createElement("div");
   tipEl.className = "chart-tip";
@@ -484,7 +506,23 @@
     const tm = allMesos.filter((m) => m.tornadic).length;
     donut("pieMeso", tm, allMesos.length - tm, "Mesocyclone count", ["Tornadic", "Nontornadic"]);
     const tmt = torScMesos.filter((m) => m.tornadic).length;
-    donut("pieMesoTs", tmt, torScMesos.length - tmt, "Mesocyclones in tornadic supercells", ["Tornadic", "Nontornadic"]);
+    // nontornadic mesos in tornadic supercells: before the first / between / after the last tornadic meso (by start time)
+    const when = { before: 0, between: 0, after: 0 };
+    for (const sc of torSc) {
+      const ms = sc.mesos.map((mi) => M[mi]), torStarts = ms.filter((m) => m.tornadic).map((m) => m.t0);
+      const first = Math.min(...torStarts), last = Math.max(...torStarts);
+      for (const m of ms) {
+        if (m.tornadic) continue;
+        if (m.t0 < first || (m.t0 === first && first === last)) when.before++;
+        else if (m.t0 > last) when.after++;
+        else when.between++;
+      }
+    }
+    donutSplit("pieMesoTs", tmt, [
+      { label: "before", value: when.before, color: "--non-before" },
+      { label: "between", value: when.between, color: "--non-between" },
+      { label: "after", value: when.after, color: "--non-after" },
+    ], "Mesocyclones in tornadic supercells");
 
     // histogram: mesos per supercell (integer bins)
     const counts = scs.map((s) => s.mesos.length), maxN = Math.max(1, ...counts);
