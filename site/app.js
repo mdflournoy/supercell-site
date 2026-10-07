@@ -259,7 +259,7 @@
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false, labels: { color: ink2, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2 } },
-        tooltip: { backgroundColor: surface, titleColor: ink, bodyColor: ink2, borderColor: css("--axis"), borderWidth: 1, padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4 },
+        tooltip: { enabled: false, external: (ctx) => floatingTip(ctx) },
       },
       scales: {
         x: { grid: { display: false }, border: { color: css("--axis") }, ticks: { color: muted, maxRotation: 0, autoSkipPadding: 8 }, title: { display: !!xTitle, text: xTitle, color: muted, font: { size: 11 } } },
@@ -283,16 +283,44 @@
         if (withinColumn) {
           const col = sets.reduce((n, ds) => n + (ds.data[c.dataIndex] || 0), 0);
           out += ` · ${pctStr(c.raw, col)} of ${c.label}`;
+          const series = c.dataset.data.reduce((x, y) => x + y, 0);
+          out += ` · ${pctStr(c.raw, series)} of ${c.dataset.label.toLowerCase()}`;
         }
         return out;
       },
     };
   }
 
-  function upsert(id, type, data, options) {
+  function upsert(id, type, data, options, plugins = []) {
     if (charts[id]) { charts[id].data = data; charts[id].options = options; charts[id].update(); return; }
-    charts[id] = new Chart($(id), { type, data, options });
+    charts[id] = new Chart($(id), { type, data, options, plugins });
   }
+
+  // Small donut above each non-zero bar: that bar's share of its own series total.
+  const barShareDonuts = {
+    id: "barShareDonuts",
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx, track = css("--grid");
+      chart.data.datasets.forEach((ds, di) => {
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        const total = ds.data.reduce((a, b) => a + b, 0);
+        meta.data.forEach((bar, i) => {
+          const v = ds.data[i];
+          if (!v || !total) return;
+          const r = Math.max(6, Math.min(bar.width / 2 - 1, 10)), lw = r * 0.5;
+          const cx = bar.x, cy = bar.y - r - 5, frac = v / total;
+          ctx.save();
+          ctx.lineWidth = lw;
+          ctx.strokeStyle = track;
+          ctx.beginPath(); ctx.arc(cx, cy, r - lw / 2, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = Array.isArray(ds.backgroundColor) ? ds.backgroundColor[i] : ds.backgroundColor;
+          ctx.beginPath(); ctx.arc(cx, cy, r - lw / 2, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        });
+      });
+    },
+  };
 
   function hist(values, width, { minEdge } = {}) {
     if (!values.length) return { labels: [], counts: [] };
@@ -332,7 +360,8 @@
   document.body.appendChild(tipEl);
   function floatingTip({ chart, tooltip }) {
     if (!tooltip || tooltip.opacity === 0) { tipEl.style.opacity = 0; return; }
-    const body = (tooltip.dataPoints || []).map((dp) => `<div><i style="background:${dp.dataset.backgroundColor[dp.dataIndex]}"></i>${chart.options.plugins.tooltip.callbacks.label(dp)}</div>`).join("");
+    const color = (dp) => (Array.isArray(dp.dataset.backgroundColor) ? dp.dataset.backgroundColor[dp.dataIndex] : dp.dataset.backgroundColor);
+    const body = (tooltip.dataPoints || []).map((dp) => `<div><i style="background:${color(dp)}"></i>${String(chart.options.plugins.tooltip.callbacks.label(dp)).trim()}</div>`).join("");
     tipEl.innerHTML = `<b>${(tooltip.title || []).join(" ")}</b>${body}`;
     const r = chart.canvas.getBoundingClientRect();
     const half = tipEl.offsetWidth / 2, vw = document.documentElement.clientWidth;
@@ -514,13 +543,14 @@
     o4.scales.x.ticks.autoSkip = false;
     o4.plugins.tooltip.callbacks = barTip((x) => `Dissipation mode: ${x}`, "supercell", "supercells", { withinColumn: true });
     o4.plugins.legend.display = true; o4.plugins.legend.position = "top"; o4.plugins.legend.align = "end";
+    o4.scales.y.grace = "35%"; // headroom for the donuts above the bars
     upsert("barEnd", "bar", {
       labels: modes,
       datasets: [
         barDs(modes.map((md) => scs.filter((x) => x.end === md && x.tornadic).length), css("--tor"), "Tornadic"),
         barDs(modes.map((md) => scs.filter((x) => x.end === md && !x.tornadic).length), css("--nontor"), "Nontornadic"),
       ],
-    }, o4);
+    }, o4, [barShareDonuts]);
 
     // EF ratings
     const efCats = ["0", "1", "2", "3", "4", "5", "U"];
