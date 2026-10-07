@@ -206,7 +206,8 @@ footer a { color: var(--ink-2); }
 .leaflet-control-scale-line + .leaflet-control-scale-line { margin-top: 3px; }
 
 /* Tornado order by intensity: small-multiple donuts */
-.order-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 8px; }
+.order-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 10px 8px; }
+.order-cell.efU { grid-column: 4; grid-row: 1 / span 2; align-self: center; }
 .order-cell { display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .order-donut { position: relative; width: 100%; max-width: 96px; aspect-ratio: 1; }
 .order-donut canvas { position: absolute; inset: 0; }
@@ -215,3 +216,13 @@ footer a { color: var(--ink-2); }
 .order-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; font-size: 12px; color: var(--ink-2); }
 .order-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .order-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+/* Floating chart tooltip (used by the small donuts so it is never clipped or covered) */
+.chart-tip {
+  position: absolute; z-index: 2000; pointer-events: none; white-space: nowrap;
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--axis); border-radius: 8px;
+  padding: 7px 9px; font-size: 12px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+  transform: translate(-50%, calc(-100% - 10px)); opacity: 0; transition: opacity .12s;
+}
+.chart-tip b { color: var(--ink); font-weight: 650; display: block; margin-bottom: 2px; }
+.chart-tip i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }

@@ -326,12 +326,28 @@
       <div class="row" style="color:var(--muted)"><span>Total</span><span>${total}</span></div>`;
   }
 
+  // Floating HTML tooltip drawn above the whole page (not clipped by small canvases).
+  const tipEl = document.createElement("div");
+  tipEl.className = "chart-tip";
+  document.body.appendChild(tipEl);
+  function floatingTip({ chart, tooltip }) {
+    if (!tooltip || tooltip.opacity === 0) { tipEl.style.opacity = 0; return; }
+    const body = (tooltip.dataPoints || []).map((dp) => `<div><i style="background:${dp.dataset.backgroundColor[dp.dataIndex]}"></i>${chart.options.plugins.tooltip.callbacks.label(dp)}</div>`).join("");
+    tipEl.innerHTML = `<b>${(tooltip.title || []).join(" ")}</b>${body}`;
+    const r = chart.canvas.getBoundingClientRect();
+    const half = tipEl.offsetWidth / 2, vw = document.documentElement.clientWidth;
+    const x = Math.min(Math.max(r.left + tooltip.caretX, half + 8), vw - half - 8);
+    tipEl.style.left = `${x + window.scrollX}px`;
+    tipEl.style.top = `${r.top + window.scrollY + tooltip.caretY}px`;
+    tipEl.style.opacity = 1;
+  }
+
   // ---------------------------------------------------------------- tornado order by intensity
   const ORD = ["Only", "1st", "2nd", "3rd", "4th", "5th+"];
   const ORD_VARS = ["--ord-only", "--ord-1", "--ord-2", "--ord-3", "--ord-4", "--ord-5"];
   const EF_BINS = ["U", "0", "1", "2", "3", "4", "5"];
-  $("orderGrid").innerHTML = EF_BINS.map((e) => `
-    <div class="order-cell">
+  $("orderGrid").innerHTML = ["0", "1", "2", "3", "4", "5", "U"].map((e) => `
+    <div class="order-cell ef${e}">
       <div class="order-donut"><canvas id="ord-${e}"></canvas><div class="order-center">${efLabel(e)}</div></div>
       <div class="order-n" id="ordn-${e}"></div>
     </div>`).join("");
@@ -357,11 +373,11 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            enabled: !!n, backgroundColor: surface, titleColor: css("--ink"), bodyColor: css("--ink-2"), borderColor: css("--axis"), borderWidth: 1, cornerRadius: 8, padding: 8,
+            enabled: false, external: n ? floatingTip : () => {},
             filter: (c) => c.raw > 0,
             callbacks: {
               title: () => `${efLabel(e)} tornadoes`,
-              label: (c) => ` ${c.label === "Only" ? "Only tornado" : c.label + " tornado"}: ${c.raw} · ${pctStr(c.raw, n)}`,
+              label: (c) => `${c.label}: ${c.raw} · ${pctStr(c.raw, n)}`,
             },
           },
         },
