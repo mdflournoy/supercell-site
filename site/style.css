@@ -13,8 +13,8 @@
   --tor: #e34948;      /* tornadic (categorical slot 8) */
   --torpath: #0b0b0b;  /* tornado damage path: heavy ink line */
   --accent: #2a78d6;
-  --ord-only: #898781; --ord-1: #ef9c74; --ord-2: #e9783f; --ord-3: #d35d24; --ord-4: #a8461a; --ord-5: #76300f;
-  --ef-u: #898781; --ef-0: #ee9b9a; --ef-1: #e97674; --ef-2: #e34948; --ef-3: #bd3333; --ef-4: #922424; --ef-5: #681717;
+  --ord-only: #898781; --ord-1: #0d0887; --ord-2: #7401a8; --ord-3: #bf3984; --ord-4: #ee7b51; --ord-5: #fcce25;
+  --ef-u: #898781; --ef-0: #0d0887; --ef-1: #6300a7; --ef-2: #a51f99; --ef-3: #d5536f; --ef-4: #f58b47; --ef-5: #fcce25;
   --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
 }
 @media (prefers-color-scheme: dark) {
@@ -24,8 +24,8 @@
     --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
     --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5;
-    --ord-only: #898781; --ord-1: #f7c4ab; --ord-2: #f29d74; --ord-3: #eb6f3a; --ord-4: #cf5420; --ord-5: #ad4118;
-    --ef-u: #898781; --ef-0: #f8c9c8; --ef-1: #f3a09f; --ef-2: #ec7372; --ef-3: #e04a49; --ef-4: #c13434; --ef-5: #962626;
+    --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
+    --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
     --shadow: none;
   }
 }
@@ -35,8 +35,8 @@
   --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
   --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5;
-    --ord-only: #898781; --ord-1: #f7c4ab; --ord-2: #f29d74; --ord-3: #eb6f3a; --ord-4: #cf5420; --ord-5: #ad4118;
-    --ef-u: #898781; --ef-0: #f8c9c8; --ef-1: #f3a09f; --ef-2: #ec7372; --ef-3: #e04a49; --ef-4: #c13434; --ef-5: #962626;
+    --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
+    --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
   --shadow: none;
 }
 
