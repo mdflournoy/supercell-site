@@ -485,11 +485,17 @@
     // histogram: time to first tornado
     // 20-min bins; label the bin that starts each hour (0–20, 60–80, ...), tilted 30°
     const ttB = hist(tts, 20, { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
+    const ttHour = (i) => { const lab = ttB.labels[i]; return lab != null && Number(lab.split("–")[0]) % 60 === 0; };
     const o2 = baseOpts("Minutes", "Supercells");
     Object.assign(o2.scales.x.ticks, {
       autoSkip: false, minRotation: 30, maxRotation: 30,
-      callback: (v, i) => { const lab = ttB.labels[i] || ""; return Number(lab.split("–")[0]) % 60 === 0 ? lab : ""; },
+      callback: (v, i) => (ttHour(i) ? ttB.labels[i] : ""),
     });
+    // short, wide gray tick marks below the axis at the labeled (hourly) bars only
+    o2.scales.x.grid = {
+      display: true, drawOnChartArea: false, drawTicks: true, offset: false,
+      tickLength: 7, tickWidth: 2, tickColor: (c) => (ttHour(c.index) ? css("--axis") : "transparent"),
+    };
     o2.plugins.tooltip.callbacks = barTip((x) => `${x} min to first tornado`, "supercell", "supercells");
     upsert("histTT", "bar", { labels: ttB.labels, datasets: [barDs(ttB.counts, css("--tor"), "Tornadic supercells")] }, o2);
     $("ttHint").textContent = tts.length ? `Min: ${dur(Math.min(...tts))}${DOT}Mean: ${dur(mean(tts))}${DOT}Max: ${dur(Math.max(...tts))}` : "No tornadic supercells in window";
