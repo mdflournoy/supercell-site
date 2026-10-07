@@ -460,7 +460,7 @@
     // histogram: mesos per supercell (integer bins)
     const counts = scs.map((s) => s.mesos.length), maxN = Math.max(1, ...counts);
     const mpc = Array.from({ length: maxN }, (_, k) => counts.filter((c) => c === k + 1).length);
-    const o1 = baseOpts("Mesocyclones in supercell", "Supercells");
+    const o1 = baseOpts("Mesocyclone count", "Supercells");
     o1.plugins.tooltip.callbacks = barTip((x) => `${x} meso${x === "1" ? "" : "s"} per supercell`, "supercell", "supercells");
     $("mpcHint").textContent = counts.length ? `Mean: ${nf(mean(counts), 2)}${DOT}Max: ${Math.max(...counts)}` : "No supercells in window";
     upsert("histMeso", "bar", { labels: mpc.map((_, k) => String(k + 1)), datasets: [barDs(mpc, css("--nontor"), "Supercells")] }, o1);
@@ -483,8 +483,13 @@
     renderOrderDonuts(scs);
 
     // histogram: time to first tornado
-    const ttB = hist(tts, niceBin(tts), { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
-    const o2 = baseOpts("Minutes after track start", "Supercells");
+    // 20-min bins; label the bin that starts each hour (0–20, 60–80, ...), tilted 30°
+    const ttB = hist(tts, 20, { minEdge: tts.length && Math.min(...tts) >= 0 ? 0 : undefined });
+    const o2 = baseOpts("Minutes", "Supercells");
+    Object.assign(o2.scales.x.ticks, {
+      autoSkip: false, minRotation: 30, maxRotation: 30,
+      callback: (v, i) => { const lab = ttB.labels[i] || ""; return Number(lab.split("–")[0]) % 60 === 0 ? lab : ""; },
+    });
     o2.plugins.tooltip.callbacks = barTip((x) => `${x} min to first tornado`, "supercell", "supercells");
     upsert("histTT", "bar", { labels: ttB.labels, datasets: [barDs(ttB.counts, css("--tor"), "Tornadic supercells")] }, o2);
     $("ttHint").textContent = tts.length ? `Min: ${dur(Math.min(...tts))}${DOT}Mean: ${dur(mean(tts))}${DOT}Max: ${dur(Math.max(...tts))}` : "No tornadic supercells in window";
