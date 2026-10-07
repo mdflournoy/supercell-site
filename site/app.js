@@ -148,18 +148,6 @@
   }
   L.control.scale({ imperial: true, metric: true }).addTo(map);
 
-  // Square marker drawn on the canvas renderer (used for meso track starts).
-  L.Canvas.include({
-    _updateSquare(layer) {
-      if (!this._drawing || layer._empty()) return;
-      const p = layer._point, ctx = this._ctx, r = Math.max(Math.round(layer._radius), 1);
-      ctx.beginPath();
-      ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
-      this._fillStroke(ctx, layer);
-    },
-  });
-  const SquareMarker = L.CircleMarker.extend({ _updatePath() { this._renderer._updateSquare(this); } });
-
   const layer = L.layerGroup().addTo(map);
   let scLines = {}; // supercell idx -> [meso polylines]
   let scTors = {};  // supercell idx -> [tornado lines/halos/dots]
@@ -197,7 +185,6 @@
     const [a, b] = win, clip = $("clipTracks").checked;
     const showNon = $("showNon").checked, showTor = $("showTorM").checked, showPaths = $("showPaths").checked;
     const surface = css("--surface"), nonC = css("--nontor"), torC = css("--tor"), pathC = css("--torpath");
-    const starts = [];
     const order = sel.mesos.slice().sort((x, y) => M[x].tornadic - M[y].tornadic); // tornadic on top
     for (const mi of order) {
       const m = M[mi];
@@ -214,9 +201,7 @@
       line.on("mouseover", () => highlight(m.sc, true)).on("mouseout", () => highlight(m.sc, false));
       line.addTo(layer);
       (scLines[m.sc] ||= []).push(line);
-      if (pts[0][0] === m.t0) starts.push([latlngs[0], m.tornadic ? torC : nonC]);
     }
-    for (const [ll, c] of starts) new SquareMarker(ll, { renderer, radius: 3.5, color: c, weight: 2, fillColor: surface, fillOpacity: 1, interactive: false }).addTo(layer);
 
     if (showPaths) {
       for (const ti of sel.paths) {
