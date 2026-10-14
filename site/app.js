@@ -1,4 +1,4 @@
-/* Observed Database of Supercells dashboard — reads data.json (built nightly by scripts/build_data.py). */
+/* Observational Database of Supercells dashboard — reads data.json (built nightly by scripts/build_data.py). */
 (async function () {
   "use strict";
 
