@@ -130,5 +130,4 @@ copies**:
 - mesocyclones within each supercell are renumbered **1, 2, 3, …** in order of their own start time;
 - the `Tornadoes` link keys and the `primary_sup` merge column are remapped to the new IDs.
 
-[`tracks/id_map.csv`](tracks/id_map.csv) lists the old and new IDs of every mesocyclone, and map
-popups on the site show a mesocyclone's original ID when it changed.
+[`tracks/id_map.csv`](tracks/id_map.csv) lists the old and new IDs of every mesocyclone.

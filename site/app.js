@@ -162,7 +162,7 @@
       : `<tr><td>Tornadoes</td><td>None</td></tr>`;
     return `<div class="pop">
       <h3>Meso ${m.label} · supercell ${s.label}</h3>
-      <div class="meta">${s.date} · ${C[s.case].file}${m.orig ? ` · originally ${m.orig} in the Drive file` : ""}</div>
+      <div class="meta">${s.date}</div>
       <table>
         <tr><td>Tracked</td><td>${fmtT(m.t0)} → ${fmtHM(m.t1)} (${dur(m.life)})</td></tr>
         <tr><td>Scans</td><td>${m.pts.length}</td></tr>
