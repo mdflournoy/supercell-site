@@ -118,3 +118,17 @@ cd site && python -m http.server 8000      # open http://localhost:8000
 
 Everything except the map shows **whole supercells active at any point in the window**.
 The map can clip tracks to the window ("Clip to window").
+
+## Renumbered track files (`tracks/`)
+
+The original CSVs in Google Drive are never modified. Each build writes a renumbered copy of
+every day file to [`tracks/`](tracks/) and commits it to this repo; **the website uses these
+copies**:
+
+- supercells are relettered **A, B, C, … Z, AA, AB, …** in order of their start time (earliest scan
+  of any of their mesocyclones);
+- mesocyclones within each supercell are renumbered **1, 2, 3, …** in order of their own start time;
+- the `Tornadoes` link keys and the `primary_sup` merge column are remapped to the new IDs.
+
+[`tracks/id_map.csv`](tracks/id_map.csv) lists the old and new IDs of every mesocyclone, and map
+popups on the site show a mesocyclone's original ID when it changed.

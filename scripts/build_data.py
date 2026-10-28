@@ -65,11 +65,21 @@ def main() -> None:
     ap.add_argument("--out", default="site/data.json")
     ap.add_argument("--ncei-cache", default="data/ncei")
     ap.add_argument("--ncei-local", default=None, help="folder of pre-downloaded NCEI details files (testing)")
+    ap.add_argument("--tordb-dir", default=None, help="extra folder to search for the tornado database CSV")
     a = ap.parse_args()
 
-    allcsv = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv")
+    allcsv = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv" and p.name != "id_map.csv")
     db_files = [p for p in allcsv if tordb.is_tordb(p)]
     files = [p for p in allcsv if p not in db_files]
+    if a.tordb_dir:
+        db_files += [p for p in sorted(Path(a.tordb_dir).rglob("*.csv")) if tordb.is_tordb(p) and p not in db_files]
+    # original (pre-renumbering) IDs, if the files came from scripts/renumber.py
+    orig = {}
+    idmap = Path(a.raw) / "id_map.csv"
+    if idmap.exists():
+        im = pd.read_csv(idmap, dtype=str, keep_default_na=False)
+        for r in im.itertuples():
+            orig[(r.file, r.new_supercell, r.new_meso)] = (r.old_supercell, r.old_meso)
     if not files:
         sys.exit(f"No MesoTrack CSVs in {a.raw}")
     db = tordb.TorDB(db_files) if db_files else None
@@ -104,7 +114,9 @@ def main() -> None:
             if sc not in sc_index:
                 sc_index[sc] = len(supercells)
                 cases[case_idx]["sc"].append(len(supercells))
-                supercells.append({"case": case_idx, "label": sc, "mesos": [], "merged_into": None})
+                o = orig.get((path.name, sc, mid))
+                supercells.append({"case": case_idx, "label": sc, "mesos": [], "merged_into": None,
+                                   "orig": o[0] if o and o[0] != sc else None})
             si = sc_index[sc]
             mi = len(mesos)
             end = str(g["dissipation"].dropna().iloc[-1]).strip() if "dissipation" in g and g["dissipation"].notna().any() else ""
@@ -113,6 +125,8 @@ def main() -> None:
                 supercells[si]["merged_into"] = prim
             mesos.append({
                 "sc": si, "label": f"{sc}{mid}", "end": end,
+                "orig": (f"{orig[(path.name, sc, mid)][0]}{orig[(path.name, sc, mid)][1]}"
+                         if (path.name, sc, mid) in orig and orig[(path.name, sc, mid)] != (sc, mid) else None),
                 "pts": [[int(r.t), round(float(r.lat), 4), round(float(r.lon), 4)] for r in g.itertuples()],
                 "tor": [],
             })
