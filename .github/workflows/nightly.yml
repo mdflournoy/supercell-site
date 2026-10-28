@@ -78,7 +78,7 @@ jobs:
 
       - name: MRMS AzShear along each meso track (tracks-AzShear/)
         continue-on-error: true   # never block the site deploy; unfinished work resumes next run
-        run: python scripts/azshear.py --tracks tracks --out tracks-AzShear --cache azshear-cache/cache.csv --status azshear-cache/status.json --max-minutes 8
+        run: python scripts/azshear.py --tracks tracks --out tracks-AzShear --cache azshear-cache/cache.csv --status azshear-cache/status.json --max-minutes 240
 
       - name: Save renumbered + AzShear files to the repo
         if: ${{ !cancelled() }}

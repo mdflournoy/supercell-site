@@ -7,7 +7,7 @@ within its tracked lifetime (first to last scan):
 
   supercell_id, meso_id, time_utc   MRMS valid time (0-2 km product)
   lat, lon                          meso position linearly interpolated to that time
-  azshear_0_2km, azshear_3_6km      peak MergedAzShear (s^-1) within RADIUS_KM of the
+  azshear_0_2km, azshear_3_6km      peak MergedAzShear (10^-3 s^-1) within RADIUS_KM of the
                                     interpolated position (blank = no valid MRMS data)
 
 The 3-6 km value uses the 3-6 km file nearest in time (within 90 s), with the position
@@ -159,7 +159,9 @@ def peak_values(key: str, points: list[tuple[float, float]], radius_km: float = 
         os.unlink(path)
     if lo1 > 180:
         lo1 -= 360.0
-    vals[vals <= -900] = np.nan  # MRMS missing (-999) / no coverage (-99900)
+    # MRMS AzShear is stored x1000 (units 0.001 s^-1); missing, no-coverage and range-folded
+    # are all encoded as 0 (NSSL operational MRMS GRIB2 tables), so treat 0 as missing.
+    vals[(vals == 0) | (vals <= -900)] = np.nan
 
     out = [window_max(vals, la1, lo1, dx, dy, j_pos, lat, lon, radius_km) for lat, lon in points]
     return {"key": key, "values": out, "bytes": len(r.content), "secs": round(time.time() - t0, 2),
@@ -227,7 +229,7 @@ def main() -> None:
     cache: dict[str, str] = {}
     if Path(a.cache).exists():
         c = pd.read_csv(a.cache, dtype=str, keep_default_na=False)
-        cache = dict(zip(c["key"], c["value"]))
+        cache = {k: v for k, v in zip(c["key"], c["value"]) if v not in ("0", "0.0", "0.000000")}
     n_cache0 = len(cache)
 
     # ---- tracks: {file: {(sc, meso): (times_s, lat, lon)}}
@@ -316,7 +318,10 @@ def main() -> None:
         series[p] = rows
 
     # ---- download + process MRMS files not yet cached, within the time budget
-    jobs = sorted(work.items())
+    def job_order(item):
+        m = KEY_RE.search(item[0])
+        return (m.group(1) + m.group(2)) if m else item[0], item[0]
+    jobs = sorted(work.items(), key=job_order)
     done = failed = 0
     nbytes = 0
     secs = []
@@ -337,7 +342,7 @@ def main() -> None:
                 try:
                     res = f.result()
                     for ck, v in zip(w["ckeys"], res["values"]):
-                        cache[ck] = "" if v is None else f"{v:.6f}"
+                        cache[ck] = "" if v is None else f"{v:g}"
                     done += 1
                     nbytes += res["bytes"]
                     secs.append(res["secs"])
@@ -366,7 +371,7 @@ def main() -> None:
                     r[col] = ""
                     blank += 1
                 elif ck in cache:
-                    r[col] = cache[ck]
+                    r[col] = f"{float(cache[ck]):g}" if cache[ck] != "" else ""
                     filled += cache[ck] != ""
                     blank += cache[ck] == ""
                 else:

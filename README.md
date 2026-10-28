@@ -143,10 +143,10 @@ renumbered IDs from `tracks/` (which is not modified):
 | `supercell_id`, `meso_id` | renumbered IDs (same as `tracks/`) |
 | `time_utc` | MRMS valid time of the 0–2 km AzShear file |
 | `lat`, `lon` | meso position linearly interpolated along its track to that time |
-| `azshear_0_2km` | peak MRMS MergedAzShear 0–2 km AGL (s⁻¹) within 2 km of that position |
+| `azshear_0_2km` | peak MRMS MergedAzShear 0–2 km AGL within 2 km of that position, in **10⁻³ s⁻¹** as stored by MRMS (e.g. `12` = 0.012 s⁻¹) |
 | `azshear_3_6km` | same for 3–6 km AGL, from the 3–6 km file nearest in time (within 90 s), position interpolated to that file's time |
 
-Blank values mean MRMS had no valid data in the circle (or the file is missing). A mesocyclone
+Blank values mean MRMS had no valid data in the circle (or the file is missing). MRMS encodes missing/no coverage as 0, so zeros are treated as missing. A mesocyclone
 tracked on only one scan gets the single MRMS time nearest to it (within 5 min).
 
 Source: `s3://noaa-mrms-pds/CONUS/MergedAzShear_0-2kmAGL_00.50/` and `..._3-6kmAGL_00.50/`.
