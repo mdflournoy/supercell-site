@@ -277,7 +277,8 @@
       const dot = L.circleMarker([e.lat, e.lon], { renderer, radius: 4, color: css("--surface"), weight: 1.5, fillColor: c, fillOpacity: 1, _r: 4 });
       dot.on("mouseover", (ev) => { highlight(m.sc, true); showEnvTip(e, ev.originalEvent); })
         .on("mousemove", (ev) => placeEnvTip(ev.originalEvent))
-        .on("mouseout", () => { highlight(m.sc, false); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; });
+        .on("mouseout", () => { highlight(m.sc, false); hideEnvTip(); })
+        .on("click", (ev) => { L.DomEvent.stop(ev); pinEnv(e, ev.originalEvent); });
       dot.addTo(layer);
       (scTors[m.sc] ||= []).push(dot);
     }
@@ -356,18 +357,21 @@
       const poly = L.polygon(wedge(e.lat, e.lon, e.dir), { renderer, color: c, weight: 1.25, opacity: 0.9, fillColor: c, fillOpacity: 0.3, _w: 1.25 });
       envDots.push([e, c]);
       const on = (ev) => { poly.setStyle({ weight: 3, fillOpacity: 0.45 }); highlight(m.sc, true); showEnvTip(e, ev.originalEvent); };
-      const off = () => { poly.setStyle({ weight: 1.25, fillOpacity: 0.3 }); highlight(m.sc, false); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; };
-      poly.on("mouseover", on).on("mousemove", (ev) => placeEnvTip(ev.originalEvent)).on("mouseout", off);
+      const off = () => { poly.setStyle({ weight: 1.25, fillOpacity: 0.3 }); highlight(m.sc, false); hideEnvTip(); };
+      poly.on("mouseover", on).on("mousemove", (ev) => placeEnvTip(ev.originalEvent)).on("mouseout", off)
+        .on("click", (ev) => { L.DomEvent.stop(ev); pinEnv(e, ev.originalEvent); });
       poly._envOn = on; poly._envOff = off;
       poly.addTo(layer);
     }
   }
 
+  // ---- sounding card (hover tip + pinned, draggable windows) ----
   const envTip = document.createElement("div");
   envTip.className = "env-tip";
   document.body.appendChild(envTip);
+  const hideEnvTip = () => { envTip.style.opacity = 0; envTip.style.visibility = "hidden"; };
   function placeEnvTip(oe) {
-    if (!oe) return;
+    if (!oe || envTip.style.visibility !== "visible") return;
     const w = envTip.offsetWidth, h = envTip.offsetHeight, vw = document.documentElement.clientWidth, vh = window.innerHeight, g = 16;
     let x = oe.clientX + g, y = oe.clientY - h / 2;
     if (x + w > vw - 8) x = oe.clientX - g - w;
@@ -377,33 +381,141 @@
   }
   const f0 = (v, u = "") => (v == null ? "—" : `${Math.round(v)}${u}`);
   const f1 = (v) => (v == null ? "—" : v.toFixed(1));
-  function showEnvTip(e, oe) {
+  // all hourly environments of one supercell, in time order (then meso label)
+  const scEnvCache = {};
+  function scEnv(si) {
+    return (scEnvCache[si] ||= ENV.filter((x) => M[x.m].sc === si && x.prof.length)
+      .sort((x, y) => x.t - y.t || (M[x.m].label < M[y.m].label ? -1 : 1)));
+  }
+  // one hodograph frame per supercell, so stepping through hours keeps the same axes
+  const hodoFrameCache = {};
+  function hodoFrame(si) {
+    if (hodoFrameCache[si]) return hodoFrameCache[si];
+    const us = [0], vs = [0];
+    for (const e of scEnv(si)) {
+      e.prof.forEach((r) => { if (r[0] != null && r[0] <= 10000 && r[4] != null) { us.push(r[4]); vs.push(r[5]); } });
+      [e.obs, e.rm].forEach((v) => { if (v && v[0] != null) { us.push(v[0]); vs.push(v[1]); } });
+    }
+    const span = Math.max(20, Math.max(...us) - Math.min(...us), Math.max(...vs) - Math.min(...vs)) + 8;
+    return (hodoFrameCache[si] = { span, cu: (Math.max(...us) + Math.min(...us)) / 2, cv: (Math.max(...vs) + Math.min(...vs)) / 2 });
+  }
+  function envBody(e) {
     const m = M[e.m], s = S[m.sc];
-    const cF = (c) => (c == null ? "" : ` (${Math.round(c * 9 / 5 + 32)}°F)`);
-    envTip.innerHTML = `<div class="env-head"><b>${s.date} · ${m.label}</b> · HRRR inflow sounding valid ${fmtT(e.t)}${e.prev ? " (hour before meso formed)" : ""}</div>
-      <div class="env-plots">${skewT(e.prof)}${hodo(e.prof, e.obs, e.rm)}</div>
+    return `<div class="env-head"><b>${s.date} · ${m.label}</b> · HRRR inflow sounding valid ${fmtT(e.t)}${e.prev ? " (hour before meso formed)" : ""}</div>
+      <div class="env-plots">${skewT(e)}${hodo(e.prof, e.obs, e.rm, hodoFrame(m.sc))}</div>
       <table class="env-params">
         <tr><td>T / T<sub>d</sub></td><td>${f1(e.T)} / ${f1(e.Td)} °C</td></tr>
         <tr><td>MLCAPE / MLCIN</td><td>${f0(e.mlcape)} / ${f0(e.mlcin)} J kg⁻¹</td></tr>
         <tr><td>MLLCL</td><td>${f0(e.mllcl)} m AGL</td></tr>
+        <tr><td>MLLFC</td><td>${f0(e.mllfc)} m AGL</td></tr>
         <tr><td>ESRH</td><td>${f0(e.esrh)} m² s⁻² <span class="dim">(obs. motion)</span> · ${f0(e.esrh_b)} <span class="dim">(Bunkers RM)</span></td></tr>
       </table>`;
+  }
+  function showEnvTip(e, oe) {
+    envTip.innerHTML = `<div class="env-pin-hint"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 17v5M9 3h6l-1 7 4 4H6l4-4z"/></svg>Click to pin this sounding, then step through the storm's hours</div><div class="env-inner">${envBody(e)}</div>`;
     envTip.style.visibility = "visible"; envTip.style.opacity = 1;
     placeEnvTip(oe);
   }
 
+  // Pinned windows: drag bar on top, ‹ › to step hour by hour through the same supercell.
+  let pinZ = 2200;
+  function pinEnv(e, oe) {
+    const si = M[e.m].sc, list = scEnv(si);
+    let i = Math.max(0, list.indexOf(e));
+    const win = document.createElement("div");
+    win.className = "env-tip env-pinned";
+    win.style.zIndex = ++pinZ;
+    win.innerHTML = `<div class="env-bar" title="Drag to move"><span class="grip" aria-hidden="true">⋮⋮</span><span class="env-bar-title"></span><button class="env-close" aria-label="Close">×</button></div>
+      <div class="env-step"><button class="env-arrow prev" aria-label="Previous hour">‹</button><div class="env-inner"></div><button class="env-arrow next" aria-label="Next hour">›</button></div>`;
+    document.body.appendChild(win);
+    const show = () => {
+      win.querySelector(".env-inner").innerHTML = envBody(list[i]);
+      win.querySelector(".env-bar-title").textContent = `Supercell ${S[si].label} · hour ${i + 1} of ${list.length}`;
+      win.querySelector(".prev").disabled = i === 0;
+      win.querySelector(".next").disabled = i === list.length - 1;
+    };
+    show();
+    win.querySelector(".prev").addEventListener("click", () => { if (i > 0) { i--; show(); } });
+    win.querySelector(".next").addEventListener("click", () => { if (i < list.length - 1) { i++; show(); } });
+    win.querySelector(".env-close").addEventListener("click", () => win.remove());
+    win.addEventListener("pointerdown", () => (win.style.zIndex = ++pinZ));
+    // start where the hover card was
+    win.style.left = envTip.style.left; win.style.top = envTip.style.top;
+    if (envTip.style.visibility !== "visible" && oe) { win.style.left = `${oe.pageX + 16}px`; win.style.top = `${oe.pageY - 150}px`; }
+    hideEnvTip();
+    const bar = win.querySelector(".env-bar");
+    bar.addEventListener("pointerdown", (ev) => {
+      if (ev.target.closest("button")) return;
+      ev.preventDefault();
+      const x0 = ev.clientX, y0 = ev.clientY, l0 = win.offsetLeft, t0 = win.offsetTop;
+      bar.setPointerCapture(ev.pointerId);
+      const move = (mv) => {
+        const vw = document.documentElement.clientWidth;
+        win.style.left = `${Math.max(window.scrollX - win.offsetWidth + 60, Math.min(window.scrollX + vw - 60, l0 + mv.clientX - x0))}px`;
+        win.style.top = `${Math.max(window.scrollY, t0 + mv.clientY - y0)}px`;
+      };
+      const up = () => { bar.removeEventListener("pointermove", move); bar.removeEventListener("pointerup", up); bar.removeEventListener("pointercancel", up); };
+      bar.addEventListener("pointermove", move); bar.addEventListener("pointerup", up); bar.addEventListener("pointercancel", up);
+    });
+  }
+
+  // ---- thermodynamics for the ML parcel trace ----
+  const RD = 287.04, CPD = 1005.7, LV = 2.501e6, EPS = 0.622, KAP = RD / CPD;
+  const esat = (tc) => 6.112 * Math.exp(17.67 * tc / (tc + 243.5)); // hPa
+  const mixr = (tc, p) => { const e = esat(tc); return EPS * e / (p - e); };
+  const tdFromW = (w, p) => { const e = w * p / (EPS + w), l = Math.log(e / 6.112); return 243.5 * l / (17.67 - l); };
+  function moistDTdp(tk, p) {
+    const rs = mixr(tk - 273.15, p);
+    return (RD * tk + LV * rs) / (CPD + LV * LV * rs * EPS / (RD * tk * tk)) / p;
+  }
+  // 100-hPa mixed-layer parcel (as MetPy mixed_parcel): mean theta and mixing ratio, lifted from the surface
+  function mlParcel(prof) {
+    if (prof._ml) return prof._ml;
+    const pr = prof.filter((r) => r[1] != null && r[2] != null && r[3] != null);
+    if (pr.length < 3) return (prof._ml = []);
+    const ps = pr[0][1], ptop = ps - 100;
+    let sw = 0, sth = 0, sq = 0;
+    for (let k = 1; k < pr.length && pr[k - 1][1] > ptop; k++) {
+      const a = pr[k - 1], b = pr[k], pb = Math.max(b[1], ptop), dp = a[1] - pb;
+      const fb = (a[1] - pb) / (a[1] - b[1]);
+      const th = (r) => (r[2] + 273.15) * Math.pow(1000 / r[1], KAP), w = (r) => mixr(r[3], r[1]);
+      const thb = th(a) + fb * (th(b) - th(a)), wb = w(a) + fb * (w(b) - w(a));
+      sth += dp * (th(a) + thb) / 2; sq += dp * (w(a) + wb) / 2; sw += dp;
+    }
+    const th = sth / sw, w = sq / sw, out = [];
+    let p = ps, tk = th * Math.pow(p / 1000, KAP);
+    // dry ascent to the LCL
+    while (p > 100 && tk - 273.15 > tdFromW(w, p)) { out.push([p, tk - 273.15]); p -= 2; tk = th * Math.pow(p / 1000, KAP); }
+    // moist (pseudo)adiabatic ascent, RK4
+    for (; p > 100; p -= 5) {
+      out.push([p, tk - 273.15]);
+      const h = -5, k1 = moistDTdp(tk, p), k2 = moistDTdp(tk + h * k1 / 2, p + h / 2), k3 = moistDTdp(tk + h * k2 / 2, p + h / 2), k4 = moistDTdp(tk + h * k3, p + h);
+      tk += h * (k1 + 2 * k2 + 2 * k3 + k4) / 6;
+    }
+    out.push([100, tk - 273.15]);
+    return (prof._ml = out);
+  }
+  const pAtZ = (prof, z) => {
+    for (let k = 1; k < prof.length; k++) {
+      const a = prof[k - 1], b = prof[k];
+      if (a[0] <= z && b[0] >= z) return Math.exp(Math.log(a[1]) + (z - a[0]) / ((b[0] - a[0]) || 1) * (Math.log(b[1]) - Math.log(a[1])));
+    }
+    return z <= (prof[0] || [0])[0] ? prof[0][1] : null;
+  };
+
   // Skew-T log-p (SVG). Isotherms skewed 45°, 1050–100 hPa.
-  function skewT(prof) {
-    const W = 230, H = 250, P0 = 1050, P1 = 100, TL = -40, TR = 40;
+  let svgId = 0;
+  function skewT(e) {
+    const prof = e.prof;
+    const W = 230, H = 250, P0 = 1050, P1 = 100, TL = -40, TR = 40, id = `skc${++svgId}`;
     const lnr = Math.log(P0 / P1), yb = (p) => H * Math.log(P0 / p) / lnr; // height above bottom
     const X = (t, p) => (t - TL) / (TR - TL) * W + yb(p), Y = (p) => H - yb(p);
-    const ink = css("--ink"), grid = css("--grid"), muted = css("--muted"), axis = css("--axis");
+    const grid = css("--grid"), muted = css("--muted"), axis = css("--axis");
     let g = "";
-    for (let t = -120; t <= 40; t += 10) g += `<line x1="${X(t, P0)}" y1="${H}" x2="${X(t, P1)}" y2="0" stroke="${t === 0 ? muted : grid}" stroke-width="${t === 0 ? 1 : 0.8}"${t === 0 ? ' stroke-dasharray="3 3"' : ""}/>`;
-    // dry adiabats (theta = 250..450 K)
+    for (let t = -120; t <= 40; t += 10) if (t !== 0) g += `<line x1="${X(t, P0)}" y1="${H}" x2="${X(t, P1)}" y2="0" stroke="${grid}" stroke-width="0.8"/>`;
     for (let th = 250; th <= 450; th += 20) {
       let d = "";
-      for (let p = P0; p >= P1; p -= 25) d += `${d ? "L" : "M"}${X(th * Math.pow(p / 1000, 0.2857) - 273.15, p).toFixed(1)},${Y(p).toFixed(1)}`;
+      for (let p = P0; p >= P1; p -= 25) d += `${d ? "L" : "M"}${X(th * Math.pow(p / 1000, KAP) - 273.15, p).toFixed(1)},${Y(p).toFixed(1)}`;
       g += `<path d="${d}" fill="none" stroke="${grid}" stroke-width="0.6" stroke-dasharray="5 3"/>`;
     }
     let labels = "";
@@ -411,21 +523,31 @@
       g += `<line x1="0" x2="${W}" y1="${Y(p)}" y2="${Y(p)}" stroke="${grid}" stroke-width="0.8"/>`;
       labels += `<text x="-3" y="${Y(p) + 3.5}" text-anchor="end">${p}</text>`;
     }
+    g += `<line x1="${X(0, P0)}" y1="${H}" x2="${X(0, P1)}" y2="0" stroke="#8a8a8a" stroke-width="1.8"/>`; // 0 °C
     for (const t of [-30, -20, -10, 0, 10, 20, 30]) labels += `<text x="${X(t, P0)}" y="${H + 11}" text-anchor="middle">${t}</text>`;
     const line = (k) => prof.filter((r) => r[1] != null && r[k] != null).map((r, i) => `${i ? "L" : "M"}${X(r[k], r[1]).toFixed(1)},${Y(r[1]).toFixed(1)}`).join("");
+    const parcel = mlParcel(prof).map(([p, t], i) => `${i ? "L" : "M"}${X(t, p).toFixed(1)},${Y(p).toFixed(1)}`).join("");
+    // effective inflow layer: cyan bracket in the lower-left corner
+    let eff = "";
+    const pb = e.eb != null ? pAtZ(prof, e.eb) : null, pt = e.et != null ? pAtZ(prof, e.et) : null;
+    if (pb && pt) {
+      const x = 14, y0 = Y(pb), y1 = Math.min(Y(pt), y0 - 2);
+      eff = `<g stroke="#17becf" stroke-width="2" stroke-linecap="round"><line x1="${x}" x2="${x}" y1="${y0}" y2="${y1}"/><line x1="${x - 5}" x2="${x + 5}" y1="${y0}" y2="${y0}"/><line x1="${x - 5}" x2="${x + 5}" y1="${y1}" y2="${y1}"/></g>
+        <text x="${x + 7}" y="${(y0 + y1) / 2 + 3}" font-size="9" font-weight="600" fill="#17becf">${f0(e.esrh)}</text>`;
+    }
     return `<svg class="skewt" viewBox="-28 -4 ${W + 32} ${H + 32}" width="${W + 32}" height="${H + 32}" role="img" aria-label="Skew-T">
-      <defs><clipPath id="skc"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath></defs>
-      <g clip-path="url(#skc)">${g}<path d="${line(3)}" fill="none" stroke="#2ca02c" stroke-width="2"/><path d="${line(2)}" fill="none" stroke="#e03131" stroke-width="2"/></g>
+      <defs><clipPath id="${id}"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath></defs>
+      <g clip-path="url(#${id})">${g}<path d="${parcel}" fill="none" stroke="#9a9a9a" stroke-width="1.5" stroke-dasharray="5 3"/><path d="${line(3)}" fill="none" stroke="#2ca02c" stroke-width="2"/><path d="${line(2)}" fill="none" stroke="#e03131" stroke-width="2"/>${eff}</g>
       <rect x="0" y="0" width="${W}" height="${H}" fill="none" stroke="${axis}"/>
       <g fill="${muted}" font-size="9">${labels}</g>
-      <text x="${W / 2}" y="${H + 24}" text-anchor="middle" font-size="9.5" fill="${muted}"><tspan fill="#e03131" font-weight="600">T</tspan>  <tspan fill="#2ca02c" font-weight="600">T<tspan font-size="7.5" dy="2">d</tspan></tspan><tspan dy="-2">  °C · hPa</tspan></text>
+      <text x="${W / 2}" y="${H + 24}" text-anchor="middle" font-size="9.5" fill="${muted}"><tspan fill="#e03131" font-weight="600">T</tspan>  <tspan fill="#2ca02c" font-weight="600">T<tspan font-size="7.5" dy="2">d</tspan></tspan><tspan dy="-2">  </tspan><tspan fill="#9a9a9a" font-weight="600">ML parcel</tspan>  <tspan fill="#17becf" font-weight="600">eff. inflow</tspan>  °C · hPa</text>
     </svg>`;
   }
 
   // Hodograph (SVG), 0–10 km AGL, colored by layer; storm motions marked.
-  const HODO_LAYERS = [[0, 1000, "#d62728"], [1000, 3000, "#2ca02c"], [3000, 6000, "#e6a700"], [6000, 10000, "#1f77b4"]];
-  function hodo(prof, obs, rm) {
-    const SZ = 236, ink = css("--ink"), grid = css("--grid"), muted = css("--muted"), axis = css("--axis");
+  const HODO_LAYERS = [[0, 500, "#9467bd"], [500, 1000, "#d62728"], [1000, 3000, "#2ca02c"], [3000, 6000, "#e6a700"], [6000, 10000, "#1f77b4"]];
+  function hodo(prof, obs, rm, frame) {
+    const SZ = 236, ink = css("--ink"), grid = css("--grid"), muted = css("--muted"), axis = css("--axis"), surf = css("--surface"), id = `hdc${++svgId}`;
     const pr = prof.filter((r) => r[0] != null && r[4] != null && r[5] != null && r[0] <= 10000);
     const interp = (z) => {
       for (let i = 1; i < pr.length; i++) {
@@ -434,14 +556,10 @@
       }
       return null;
     };
-    // square view fitted to the hodograph, the storm motions and the origin
-    const us = [0, ...pr.map((r) => r[4])], vs = [0, ...pr.map((r) => r[5])];
-    [obs, rm].forEach((v) => { if (v && v[0] != null) { us.push(v[0]); vs.push(v[1]); } });
-    const span = Math.max(20, Math.max(...us) - Math.min(...us), Math.max(...vs) - Math.min(...vs)) + 8;
-    const cu = (Math.max(...us) + Math.min(...us)) / 2, cv = (Math.max(...vs) + Math.min(...vs)) / 2;
+    const { span, cu, cv } = frame;
     const k = SZ / span, X = (u) => SZ / 2 + (u - cu) * k, Y = (v) => SZ / 2 - (v - cv) * k;
     const P = (u, v) => `${X(u).toFixed(1)},${Y(v).toFixed(1)}`;
-    const ring = span > 70 ? 20 : 10, rmax = Math.hypot(Math.max(Math.abs(cu), 1) + span, Math.abs(cv) + span);
+    const ring = span > 70 ? 20 : 10, rmax = Math.hypot(Math.abs(cu) + span, Math.abs(cv) + span);
     let g = "";
     for (let r = ring; r <= rmax; r += ring) {
       g += `<circle cx="${X(0)}" cy="${Y(0)}" r="${r * k}" fill="none" stroke="${grid}" stroke-width="0.8"/>`;
@@ -453,19 +571,21 @@
       const seg = [interp(z0) || pr[0], ...pr.filter((r) => r[0] > z0 && r[0] < z1), interp(z1)].filter(Boolean);
       if (seg.length > 1) g += `<polyline points="${seg.map((r) => P(r[4], r[5])).join(" ")}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
     }
-    const mark = (v, label, shape) => {
-      if (!v || v[0] == null) return "";
-      const x = X(v[0]), y = Y(v[1]);
-      const sym = shape === "o" ? `<circle cx="${x}" cy="${y}" r="3.5" fill="none" stroke="${ink}" stroke-width="1.6"/>`
-        : `<path d="M${x - 3.5},${y - 3.5}L${x + 3.5},${y + 3.5}M${x - 3.5},${y + 3.5}L${x + 3.5},${y - 3.5}" stroke="${ink}" stroke-width="1.6"/>`;
-      return `${sym}<text x="${shape === "o" ? x - 6 : x + 6}" y="${y + (shape === "o" ? -5 : 11)}" text-anchor="${shape === "o" ? "end" : "start"}" font-size="9.5" font-weight="600" fill="${ink}">${label}</text>`;
-    };
-    g += mark(obs, "Obs", "o") + mark(rm, "RM", "x");
+    const gray = "#8a8a8a";
+    const circ = (x, y) => `<circle cx="${x}" cy="${y}" r="3.5" fill="none" stroke="${ink}" stroke-width="1.6"/>`;
+    const cross = (x, y) => `<path d="M${x - 3.5},${y - 3.5}L${x + 3.5},${y + 3.5}M${x - 3.5},${y + 3.5}L${x + 3.5},${y - 3.5}" stroke="${gray}" stroke-width="1.8"/>`;
+    if (obs && obs[0] != null) g += circ(X(obs[0]), Y(obs[1]));
+    if (rm && rm[0] != null) g += cross(X(rm[0]), Y(rm[1]));
+    // legend, bottom-right
+    const lx = SZ - 80, ly = SZ - 30;
+    const legend = `<rect x="${lx - 6}" y="${ly - 9}" width="84" height="35" rx="4" fill="${surf}" fill-opacity="0.85" stroke="${grid}"/>
+      ${circ(lx + 2, ly)}<text x="${lx + 11}" y="${ly + 3.5}" font-size="9.5" fill="${ink}">Observed</text>
+      ${cross(lx + 2, ly + 15)}<text x="${lx + 11}" y="${ly + 18.5}" font-size="9.5" fill="${ink}">Bunkers RM</text>`;
     const key = HODO_LAYERS.map(([z0, z1, c], i) => `<tspan fill="${c}" font-weight="600">${i ? "  " : ""}${z0 / 1000}–${z1 / 1000}</tspan>`).join("");
     return `<svg class="hodo" viewBox="-2 -4 ${SZ + 4} ${SZ + 32}" width="${SZ + 4}" height="${SZ + 32}" role="img" aria-label="Hodograph">
-      <defs><clipPath id="hdc"><rect x="0" y="0" width="${SZ}" height="${SZ}"/></clipPath></defs>
-      <g clip-path="url(#hdc)">${g}</g><rect x="0" y="0" width="${SZ}" height="${SZ}" fill="none" stroke="${axis}"/>
-      <text x="${SZ / 2}" y="${SZ + 24}" text-anchor="middle" font-size="9.5" fill="${muted}">${key}<tspan>  km AGL · m s⁻¹</tspan></text></svg>`;
+      <defs><clipPath id="${id}"><rect x="0" y="0" width="${SZ}" height="${SZ}"/></clipPath></defs>
+      <g clip-path="url(#${id})">${g}</g>${legend}<rect x="0" y="0" width="${SZ}" height="${SZ}" fill="none" stroke="${axis}"/>
+      <text x="${SZ / 2}" y="${SZ + 24}" text-anchor="middle" font-size="9.5" fill="${muted}">${key}<tspan>  km · m s⁻¹</tspan></text></svg>`;
   }
 
   function fitToSelection(sel) {

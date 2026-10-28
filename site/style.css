@@ -292,3 +292,21 @@ footer a { color: var(--ink-2); }
 .sc-row i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
 .sc-row b { font-weight: 650; color: var(--ink); min-width: 1.6em; }
 .sc-row .dim { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* sounding card: pin hint, pinned window, drag bar, hour arrows */
+.env-pin-hint { display: flex; align-items: center; gap: 6px; margin: -8px -10px 6px; padding: 5px 10px; border-radius: 10px 10px 0 0;
+  background: var(--surface-2); border-bottom: 1px solid var(--ring); color: var(--ink-2); font-size: 11.5px; font-weight: 600; }
+.env-pinned { pointer-events: auto; opacity: 1; visibility: visible; transition: none; padding: 0 0 8px; }
+.env-bar { display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 10px; margin-bottom: 4px; cursor: grab; user-select: none; touch-action: none;
+  background: var(--surface-2); border-bottom: 1px solid var(--ring); border-radius: 10px 10px 0 0; font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.env-bar:active { cursor: grabbing; }
+.env-bar .grip { color: var(--muted); letter-spacing: -2px; }
+.env-bar-title { flex: 1; }
+.env-close { border: 0; background: none; font-size: 18px; line-height: 1; padding: 0 6px; color: var(--muted); cursor: pointer; }
+.env-close:hover { color: var(--ink); }
+.env-step { display: flex; align-items: stretch; }
+.env-pinned .env-inner { padding: 0 2px; }
+.env-arrow { flex: none; width: 26px; border: 0; background: none; font-size: 26px; line-height: 1; color: var(--ink-2); cursor: pointer; border-radius: 6px; }
+.env-arrow:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.env-arrow:disabled { opacity: .2; cursor: default; }
+.env-inner .env-head { white-space: nowrap; }
