@@ -290,6 +290,6 @@ footer a { color: var(--ink-2); }
 .sc-row { display: flex; align-items: center; gap: 7px; padding: 3px 12px; font-size: 12.5px; cursor: pointer; }
 .sc-row:hover { background: var(--surface-2); }
 .sc-row i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
-.sc-row button { border: 0; background: none; padding: 1px 2px; font-weight: 650; color: var(--ink); min-width: 2.2em; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.sc-row button { border: 0; background: none; padding: 1px 2px; font-weight: 650; color: var(--ink); min-width: 2.2em; text-align: left; text-decoration: none; cursor: pointer; }
 .sc-row button:hover { color: var(--tor); }
 .sc-row .dim { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
