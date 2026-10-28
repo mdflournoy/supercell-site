@@ -274,7 +274,7 @@
     // a dot where each environment slice's apex sits on its parent track (drawn above the tracks)
     for (const [e, c] of envDots) {
       const m = M[e.m];
-      const dot = L.circleMarker([e.lat, e.lon], { renderer, radius: 4, color: css("--surface"), weight: 1.5, fillColor: c, fillOpacity: 1, _r: 4 });
+      const dot = L.circleMarker([e.lat, e.lon], { renderer, radius: 4, stroke: false, fillColor: c, fillOpacity: 1, _r: 4 });
       dot.on("mouseover", (ev) => { highlight(m.sc, true); showEnvTip(e, ev.originalEvent); })
         .on("mousemove", (ev) => placeEnvTip(ev.originalEvent))
         .on("mouseout", () => { highlight(m.sc, false); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; });
