@@ -14,6 +14,7 @@
   --tor: #e34948;      /* tornadic (categorical slot 8) */
   --torpath: #0b0b0b;  /* tornado damage path: heavy ink line */
   --accent: #2a78d6;
+  --az-nodata: #b9b7b0;
   --ord-only: #898781; --ord-1: #0d0887; --ord-2: #7401a8; --ord-3: #bf3984; --ord-4: #ee7b51; --ord-5: #fcce25;
   --ef-u: #898781; --ef-0: #0d0887; --ef-1: #6300a7; --ef-2: #a51f99; --ef-3: #d5536f; --ef-4: #f58b47; --ef-5: #fcce25;
   --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
@@ -24,7 +25,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
     --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
-    --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
+    --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --az-nodata: #55544f; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
     --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
     --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
     --shadow: none;
@@ -35,7 +36,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
   --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
-  --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
+  --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --az-nodata: #55544f; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
     --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
     --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
   --shadow: none;
@@ -239,3 +240,18 @@ footer a { color: var(--ink-2); }
 .tabs button:hover { background: var(--surface); }
 
 .donut-text .row.sub { padding-left: 15px; font-size: 12px; }
+
+/* AzShear map control */
+.az-ctl { background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 10px; padding: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.15); font-size: 12.5px; min-width: 0; }
+.az-toggle { width: 100%; font-weight: 600; padding: 5px 12px; }
+.az-toggle[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: transparent; }
+.az-toggle:disabled { opacity: .5; cursor: not-allowed; }
+.az-opts { margin-top: 6px; width: 228px; }
+.az-opts[hidden] { display: none; }
+.az-seg { display: flex; padding: 2px; border: 1px solid var(--ring); border-radius: 8px; background: var(--surface-2); }
+.az-seg button { flex: 1; border: 0; background: transparent; padding: 4px 6px; border-radius: 6px; font-size: 12px; color: var(--ink-2); }
+.az-seg button[aria-checked="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.az-bar { height: 10px; border-radius: 3px; margin-top: 8px; }
+.az-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.az-unit { color: var(--ink-2); font-size: 11px; margin-top: 3px; display: flex; align-items: center; gap: 5px; }
+.az-nodata { display: inline-block; width: 14px; height: 4px; border-radius: 2px; background: var(--az-nodata); }

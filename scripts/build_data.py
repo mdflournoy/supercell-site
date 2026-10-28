@@ -66,6 +66,7 @@ def main() -> None:
     ap.add_argument("--ncei-cache", default="data/ncei")
     ap.add_argument("--ncei-local", default=None, help="folder of pre-downloaded NCEI details files (testing)")
     ap.add_argument("--tordb-dir", default=None, help="extra folder to search for the tornado database CSV")
+    ap.add_argument("--azshear-dir", default=None, help="folder of MRMS AzShear series (tracks-AzShear/)")
     a = ap.parse_args()
 
     allcsv = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv" and p.name != "id_map.csv")
@@ -138,6 +139,30 @@ def main() -> None:
                 problems.append(f"{path.name}: tornado link '{key}' doesn't match any meso")
                 continue
             pending_links.append((mi, ev, path.name))
+
+    # MRMS AzShear series per meso: [[epoch, lat, lon, low, mid], ...] (values in 1e-3 s^-1)
+    n_az = 0
+    if a.azshear_dir and Path(a.azshear_dir).is_dir():
+        lookup = {}
+        for mi, m in enumerate(mesos):
+            s_ = supercells[m["sc"]]
+            lookup[(cases[s_["case"]]["file"], s_["label"], m["label"][len(s_["label"]):])] = mi
+        for f in sorted(Path(a.azshear_dir).glob("*.csv")):
+            try:
+                az = pd.read_csv(f, dtype={"supercell_id": str, "meso_id": str})
+            except Exception as e:  # noqa: BLE001
+                problems.append(f"{f.name}: AzShear file unreadable ({e})")
+                continue
+            az["t"] = (pd.to_datetime(az["time_utc"], utc=True) - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds()
+            for (sc, ms), g in az.groupby(["supercell_id", "meso_id"]):
+                mi = lookup.get((f.name, str(sc).strip(), str(ms).strip()))
+                if mi is None:
+                    continue
+                num = lambda v: None if pd.isna(v) else round(float(v), 3)
+                mesos[mi]["az"] = [[int(r.t), round(float(r.lat), 4), round(float(r.lon), 4), num(r.azshear_0_2km), num(r.azshear_3_6km)]
+                                   for r in g.sort_values("t").itertuples()]
+                n_az += 1
+        print(f"AzShear series attached to {n_az} of {len(mesos)} mesocyclones")
 
     for s in supercells:
         ts = [p[0] for mi in s["mesos"] for p in mesos[mi]["pts"]]

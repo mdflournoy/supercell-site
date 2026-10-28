@@ -115,6 +115,10 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   widens every track and tornado belonging to that supercell.
 - A sortable table of days; click a row to jump to that day.
 - Light and dark themes (follows the system setting; the button toggles).
+- **AzShear** button (upper right of the map): colors each mesocyclone track by MRMS peak AzShear
+  from `tracks-AzShear/` — choose Low-level (0–2 km AGL) or Mid-level (3–6 km AGL). Track outlines
+  stay red/blue (tornadic/nontornadic); the fill uses the plasma colormap on a fixed 0–20
+  (×10⁻³ s⁻¹) scale, gray where MRMS has no data. Off by default.
 
 Everything except the map shows **whole supercells active at any point in the window**.
 The map can clip tracks to the window ("Clip to window").

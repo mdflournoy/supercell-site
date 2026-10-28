@@ -49,6 +49,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start from the latest main (includes files saved by earlier runs)
+        run: git fetch --depth=1 origin main && git reset --hard origin/main
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -73,12 +76,12 @@ jobs:
       - name: Renumber supercells (A, B, C...) and mesos (1, 2, 3...) by start time
         run: python scripts/renumber.py --raw data/raw --out tracks
 
-      - name: Build data.json from the renumbered files
-        run: python scripts/build_data.py --raw tracks --tordb-dir data/raw --out site/data.json
-
       - name: MRMS AzShear along each meso track (tracks-AzShear/)
         continue-on-error: true   # never block the site deploy; unfinished work resumes next run
         run: python scripts/azshear.py --tracks tracks --out tracks-AzShear --cache azshear-cache/cache.csv --status azshear-cache/status.json --max-minutes 240
+
+      - name: Build data.json from the renumbered files (+ AzShear series)
+        run: python scripts/build_data.py --raw tracks --tordb-dir data/raw --azshear-dir tracks-AzShear --out site/data.json
 
       - name: Save renumbered + AzShear files to the repo
         if: ${{ !cancelled() }}

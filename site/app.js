@@ -149,6 +149,52 @@
   L.control.scale({ imperial: true, metric: true }).addTo(map);
 
   const layer = L.layerGroup().addTo(map);
+
+  // ---- AzShear coloring (MRMS peak AzShear within 2 km, 1e-3 s^-1), plasma colormap
+  const PLASMA = ["#0d0887", "#41049d", "#6a00a8", "#8f0da4", "#b12a90", "#cc4778", "#e16462", "#f2844b", "#fca636", "#fcce25", "#f0f921"];
+  const AZ_MAX = 20;           // top of the color scale (values above are drawn at the top color)
+  const AZ_LEVELS = { lo: { idx: 3, name: "Low-level", layer: "0–2 km AGL" }, mid: { idx: 4, name: "Mid-level", layer: "3–6 km AGL" } };
+  let azMode = null;           // null (off) | "lo" | "mid"
+  const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  function azColor(v) {
+    const f = Math.max(0, Math.min(1, v / AZ_MAX)) * (PLASMA.length - 1);
+    const i = Math.min(PLASMA.length - 2, Math.floor(f)), k = f - i;
+    const a = hexToRgb(PLASMA[i]), b = hexToRgb(PLASMA[i + 1]);
+    return `rgb(${a.map((x, j) => Math.round(x + (b[j] - x) * k)).join(",")})`;
+  }
+  const hasAz = M.some((m) => m.az && m.az.length);
+  const AzControl = L.Control.extend({
+    options: { position: "topright" },
+    onAdd() {
+      const el = L.DomUtil.create("div", "az-ctl");
+      el.innerHTML = `
+        <button class="az-toggle" aria-pressed="false" title="${hasAz ? "Color tracks by MRMS AzShear" : "AzShear data not available yet"}" ${hasAz ? "" : "disabled"}>AzShear</button>
+        <div class="az-opts" hidden>
+          <div class="az-seg" role="radiogroup" aria-label="AzShear level">
+            <button role="radio" data-l="lo" aria-checked="true">Low-level</button>
+            <button role="radio" data-l="mid" aria-checked="false">Mid-level</button>
+          </div>
+          <div class="az-bar" style="background:linear-gradient(90deg,${PLASMA.join(",")})"></div>
+          <div class="az-scale"><span>0</span><span>${AZ_MAX / 2}</span><span>${AZ_MAX}+</span></div>
+          <div class="az-unit" id="azUnit"></div>
+          <div class="az-unit"><i class="az-nodata"></i>no data</div>
+        </div>`;
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+      const tog = el.querySelector(".az-toggle"), opts = el.querySelector(".az-opts");
+      const sync = () => {
+        tog.setAttribute("aria-pressed", azMode ? "true" : "false");
+        opts.hidden = !azMode;
+        el.querySelectorAll(".az-seg button").forEach((b) => b.setAttribute("aria-checked", b.dataset.l === azMode ? "true" : "false"));
+        if (azMode) el.querySelector("#azUnit").textContent = `Peak AzShear, ${AZ_LEVELS[azMode].layer} (10⁻³ s⁻¹)`;
+      };
+      tog.addEventListener("click", () => { azMode = azMode ? null : "lo"; sync(); render(); });
+      el.querySelectorAll(".az-seg button").forEach((b) => b.addEventListener("click", () => { azMode = b.dataset.l; sync(); render(); }));
+      sync();
+      return el;
+    },
+  });
+  new AzControl().addTo(map);
   let scLines = {}; // supercell idx -> [meso polylines]
   let scTors = {};  // supercell idx -> [tornado lines/halos/dots]
 
@@ -167,6 +213,7 @@
         <tr><td>Tracked</td><td>${fmtT(m.t0)} → ${fmtHM(m.t1)} (${dur(m.life)})</td></tr>
         <tr><td>Scans</td><td>${m.pts.length}</td></tr>
         <tr><td>Supercell end</td><td>${s.end}${s.merged_into ? ` (merged into ${s.merged_into})` : ""}</td></tr>
+        ${m.az && m.az.length ? `<tr><td>Peak AzShear</td><td>${["lo", "mid"].map((l) => { const vs = m.az.map((p) => p[AZ_LEVELS[l].idx]).filter((v) => v != null); return `${AZ_LEVELS[l].name.toLowerCase()} ${vs.length ? Math.max(...vs) : "—"}`; }).join(" · ")} (10⁻³ s⁻¹)</td></tr>` : ""}
         <tr><td>Supercell</td><td>${s.mesos.length} meso${s.mesos.length > 1 ? "s" : ""}, ${dur((s.t1 - s.t0) / 60)}${s.tt != null ? `, 1st tornado +${dur(s.tt)}` : ""}</td></tr>
         ${torRows}
       </table></div>`;
@@ -193,7 +240,10 @@
       if (clip) pts = pts.filter((p) => p[0] >= a && p[0] <= b);
       if (!pts.length) continue;
       const latlngs = pts.map((p) => [p[1], p[2]]);
-      const w = m.tornadic ? 3 : 2.25, o = m.tornadic ? 0.95 : 0.8;
+      let azPts = azMode && m.az ? m.az : null;
+      if (azPts && clip) azPts = azPts.filter((p) => p[0] >= a && p[0] <= b);
+      const azOn = !!(azPts && azPts.length > 1);
+      const w = azOn ? 7 : (m.tornadic ? 3 : 2.25), o = azOn ? 1 : (m.tornadic ? 0.95 : 0.8);
       const line = (latlngs.length > 1 ? L.polyline(latlngs, { renderer, color: m.tornadic ? torC : nonC, weight: w, opacity: o, lineCap: "round", lineJoin: "round", _w: w, _o: o })
         : L.circleMarker(latlngs[0], { renderer, radius: 3, color: m.tornadic ? torC : nonC, weight: 2, _w: 2, _o: 1 }));
       line.bindTooltip(`<b>${S[m.sc].date} · ${m.label}</b><br>${fmtHM(m.t0)}–${fmtHM(m.t1)} · ${dur(m.life)}${m.tornadic ? ` · ${m.tor.length} tornado${m.tor.length > 1 ? "es" : ""}` : ""}`, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] });
@@ -201,6 +251,18 @@
       line.on("mouseover", () => highlight(m.sc, true)).on("mouseout", () => highlight(m.sc, false));
       line.addTo(layer);
       (scLines[m.sc] ||= []).push(line);
+      if (azOn) {
+        // fill: one segment per MRMS interval, colored by the mean of its endpoint values
+        const vi = AZ_LEVELS[azMode].idx, noData = css("--az-nodata");
+        for (let k = 0; k < azPts.length - 1; k++) {
+          const v0 = azPts[k][vi], v1 = azPts[k + 1][vi];
+          const v = v0 == null ? v1 : v1 == null ? v0 : (v0 + v1) / 2;
+          const seg = L.polyline([[azPts[k][1], azPts[k][2]], [azPts[k + 1][1], azPts[k + 1][2]]],
+            { renderer, color: v == null ? noData : azColor(v), weight: 3.5, opacity: 1, lineCap: "round", interactive: false, _w: 3.5, _o: 1 });
+          seg.addTo(layer);
+          scLines[m.sc].push(seg);
+        }
+      }
     }
 
     if (showPaths) {
