@@ -131,3 +131,25 @@ copies**:
 - the `Tornadoes` link keys and the `primary_sup` merge column are remapped to the new IDs.
 
 [`tracks/id_map.csv`](tracks/id_map.csv) lists the old and new IDs of every mesocyclone.
+
+## MRMS AzShear series (`tracks-AzShear/`)
+
+For each day, [`tracks-AzShear/YYYYMMDD.csv`](tracks-AzShear/) has one row for every mesocyclone
+at every MRMS time (~2 min) within its tracked lifetime (first to last scan), using the
+renumbered IDs from `tracks/` (which is not modified):
+
+| column | meaning |
+|---|---|
+| `supercell_id`, `meso_id` | renumbered IDs (same as `tracks/`) |
+| `time_utc` | MRMS valid time of the 0–2 km AzShear file |
+| `lat`, `lon` | meso position linearly interpolated along its track to that time |
+| `azshear_0_2km` | peak MRMS MergedAzShear 0–2 km AGL (s⁻¹) within 2 km of that position |
+| `azshear_3_6km` | same for 3–6 km AGL, from the 3–6 km file nearest in time (within 90 s), position interpolated to that file's time |
+
+Blank values mean MRMS had no valid data in the circle (or the file is missing). A mesocyclone
+tracked on only one scan gets the single MRMS time nearest to it (within 5 min).
+
+Source: `s3://noaa-mrms-pds/CONUS/MergedAzShear_0-2kmAGL_00.50/` and `..._3-6kmAGL_00.50/`.
+Each MRMS file is processed once; results are cached in `azshear-cache/cache.csv`, so nightly
+runs only fetch what new or edited tracks need. A run spends at most ~4 hours on MRMS and
+resumes where it left off on the next run; `azshear-cache/status.json` summarizes the last run.

@@ -2,3 +2,4 @@ pandas>=2.1
 numpy>=1.26
 requests>=2.31
 google-auth>=2.23
+pygrib>=2.1.5
