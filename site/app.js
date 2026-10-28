@@ -936,7 +936,7 @@
     scPanelOpen(false);
     $("scList").innerHTML = pickDay == null ? "" : (scByDay[pickDay] || []).map((si) => {
       const s = S[si];
-      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}" title="Show only supercell ${s.label}">${s.label}</button><span class="dim">${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
+      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><b>${s.label}</b><span class="dim">${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
     }).join("");
     setScShow(null);
   }
@@ -944,13 +944,6 @@
   $("scBtn").addEventListener("click", (e) => { e.stopPropagation(); scPanelOpen($("scPanel").hidden); });
   document.addEventListener("click", (e) => { if (!$("scPick").contains(e.target)) scPanelOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") scPanelOpen(false); });
-  $("scList").addEventListener("click", (e) => {
-    const only = e.target.closest("button[data-only]");
-    if (!only) return;
-    e.preventDefault();
-    setScShow(new Set([+only.dataset.only]));
-    render({ fit: true });
-  });
   $("scList").addEventListener("change", (e) => {
     const cb = e.target.closest("input[data-si]"); if (!cb) return;
     const next = new Set(scShow || scByDay[pickDay]);

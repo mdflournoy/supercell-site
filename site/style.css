@@ -287,9 +287,8 @@ footer a { color: var(--ink-2); }
 .sc-panel-head button { flex: none; padding: 4px 10px; }
 .sc-list { max-height: 360px; overflow-y: auto; padding: 4px 0 6px; }
 .sc-day { position: sticky; top: 0; background: var(--surface-2); padding: 4px 10px; font-size: 12px; font-weight: 650; color: var(--ink-2); }
-.sc-row { display: flex; align-items: center; gap: 7px; padding: 3px 12px; font-size: 12.5px; cursor: pointer; }
+.sc-row { user-select: none; display: flex; align-items: center; gap: 7px; padding: 3px 12px; font-size: 12.5px; cursor: pointer; }
 .sc-row:hover { background: var(--surface-2); }
 .sc-row i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
-.sc-row button { border: 0; background: none; padding: 1px 2px; font-weight: 650; color: var(--ink); min-width: 2.2em; text-align: left; text-decoration: none; cursor: pointer; }
-.sc-row button:hover { color: var(--tor); }
+.sc-row b { font-weight: 650; color: var(--ink); min-width: 1.6em; }
 .sc-row .dim { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
