@@ -3,3 +3,5 @@ numpy>=1.26
 requests>=2.31
 google-auth>=2.23
 pygrib>=2.1.5
+metpy>=1.6
+ecape==0.1.1
