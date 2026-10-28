@@ -149,6 +149,8 @@
   L.control.scale({ imperial: true, metric: true }).addTo(map);
 
   const layer = L.layerGroup().addTo(map);
+  map.createPane("trkLabels").style.zIndex = 450;
+  map.getPane("trkLabels").style.pointerEvents = "none";
 
   // ---- AzShear coloring (MRMS peak AzShear within 2 km, 1e-3 s^-1), plasma colormap
   const PLASMA = ["#0d0887", "#41049d", "#6a00a8", "#8f0da4", "#b12a90", "#cc4778", "#e16462", "#f2844b", "#fca636", "#fcce25", "#f0f921"];
@@ -228,15 +230,17 @@
   }
 
   function drawMap(sel) {
-    layer.clearLayers(); scLines = {}; scTors = {};
+    layer.clearLayers(); scLines = {}; scTors = {}; envDots = [];
     const [a, b] = win, clip = true;
     const showNon = $("showNon").checked, showTor = $("showTorM").checked, showPaths = $("showPaths").checked;
     const surface = css("--surface"), nonC = css("--nontor"), torC = css("--tor"), pathC = css("--torpath");
     const order = sel.mesos.slice().sort((x, y) => M[x].tornadic - M[y].tornadic); // tornadic on top
     if ($("showEnv").checked && ENV) drawEnv(sel, a, b, showNon, showTor, torC, nonC);
+    const labelsOn = b - a <= 36 * 3600, labels = [];
     for (const mi of order) {
       const m = M[mi];
       if (m.tornadic ? !showTor : !showNon) continue;
+      if (scShow && !scShow.has(m.sc)) continue;
       let pts = m.pts;
       if (clip) pts = pts.filter((p) => p[0] >= a && p[0] <= b);
       if (!pts.length) continue;
@@ -252,6 +256,7 @@
       line.on("mouseover", () => highlight(m.sc, true)).on("mouseout", () => highlight(m.sc, false));
       line.addTo(layer);
       (scLines[m.sc] ||= []).push(line);
+      if (labelsOn) labels.push([latlngs[0], m.label, m.tornadic ? torC : nonC]);
       if (azOn) {
         // fill: one segment per MRMS interval, colored by the mean of its endpoint values
         const vi = AZ_LEVELS[azMode].idx, noData = css("--az-nodata");
@@ -266,9 +271,28 @@
       }
     }
 
+    // a dot where each environment slice's apex sits on its parent track (drawn above the tracks)
+    for (const [e, c] of envDots) {
+      const m = M[e.m];
+      const dot = L.circleMarker([e.lat, e.lon], { renderer, radius: 4, color: css("--surface"), weight: 1.5, fillColor: c, fillOpacity: 1, _r: 4 });
+      dot.on("mouseover", (ev) => { highlight(m.sc, true); showEnvTip(e, ev.originalEvent); })
+        .on("mousemove", (ev) => placeEnvTip(ev.originalEvent))
+        .on("mouseout", () => { highlight(m.sc, false); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; });
+      dot.addTo(layer);
+      (scTors[m.sc] ||= []).push(dot);
+    }
+    envDots = [];
+
+    // meso IDs on the map when looking at about one day
+    for (const [ll, txt, c] of labels) {
+      L.marker(ll, { icon: L.divIcon({ className: "trk-label", html: `<span style="color:${c}">${txt}</span>`, iconSize: null, iconAnchor: [-4, 8] }),
+        interactive: false, keyboard: false, pane: "trkLabels" }).addTo(layer);
+    }
+
     if (showPaths) {
       for (const ti of sel.paths) {
         const t = T[ti];
+        if (scShow && !t.mesos.some((mi) => scShow.has(M[mi].sc))) continue;
         const tip = `<b>${efLabel(t.ef)} tornado</b> <b>(${t.mlabels})</b>${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}<br>${fmtT(t.t0)}–${fmtHM(t.t1)}<br>${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.wid ? ` · max ${t.wid} yd` : ""}`;
         const segRows = t.segs.map((g) => `<tr><td><span class="ef-chip">${efLabel(g.ef)}</span></td><td>${fmtHM(g.t0)}–${fmtHM(g.t1)} · ${g.where}${g.len != null ? ` · ${g.len} mi` : ""} · <a href="${nceiLink(g.event)}" target="_blank" rel="noopener">${g.event}</a>${t.linked.includes(g.event) ? " ◂ linked" : ""}${g.path ? "" : " (no location)"}</td></tr>`).join("");
         const pop = `<div class="pop"><h3>${efLabel(t.ef)} tornado (${t.mlabels})${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}</h3><div class="meta">Meso ${t.mlabels} · supercell ${S[t.sc].label} · ${S[t.sc].date}</div><table>
@@ -303,7 +327,7 @@
   }
 
   // ---------------------------------------------------------------- HRRR inflow environments
-  let ENV = null, envLoading = null;
+  let ENV = null, envLoading = null, scShow = null; // scShow: Set of visible supercell indices, or null = all
   async function loadEnv() {
     if (ENV) return ENV;
     envLoading ||= fetch("env.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
@@ -313,12 +337,13 @@
   const ENV_R = 40, ENV_HALF = 45; // km, degrees (matches scripts/hrrr_env.py)
   function wedge(lat, lon, dir) {
     const pts = [[lat, lon]], kx = 111.2 * Math.cos(lat * Math.PI / 180);
-    for (let b = dir - ENV_HALF; b <= dir + ENV_HALF + 1e-6; b += 5) {
+    for (let b = dir - ENV_HALF; b <= dir + ENV_HALF + 1e-6; b += 2.5) {
       const r = b * Math.PI / 180;
       pts.push([lat + ENV_R * Math.cos(r) / 111.2, lon + ENV_R * Math.sin(r) / kx]);
     }
     return pts;
   }
+  let envDots = [];
   function drawEnv(sel, a, b, showNon, showTor, torC, nonC) {
     const want = new Set(sel.mesos);
     const recs = ENV.filter((e) => want.has(e.m) && e.t >= a - 1800 && e.t <= b + 1800 && e.dir != null)
@@ -326,11 +351,14 @@
     for (const e of recs) {
       const m = M[e.m];
       if (m.tornadic ? !showTor : !showNon) continue;
+      if (scShow && !scShow.has(m.sc)) continue;
       const c = m.tornadic ? torC : nonC;
       const poly = L.polygon(wedge(e.lat, e.lon, e.dir), { renderer, color: c, weight: 1.25, opacity: 0.9, fillColor: c, fillOpacity: 0.3, _w: 1.25 });
-      poly.on("mouseover", (ev) => { poly.setStyle({ weight: 3, fillOpacity: 0.45 }); showEnvTip(e, ev.originalEvent); })
-        .on("mousemove", (ev) => placeEnvTip(ev.originalEvent))
-        .on("mouseout", () => { poly.setStyle({ weight: 1.25, fillOpacity: 0.3 }); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; });
+      envDots.push([e, c]);
+      const on = (ev) => { poly.setStyle({ weight: 3, fillOpacity: 0.45 }); highlight(m.sc, true); showEnvTip(e, ev.originalEvent); };
+      const off = () => { poly.setStyle({ weight: 1.25, fillOpacity: 0.3 }); highlight(m.sc, false); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; };
+      poly.on("mouseover", on).on("mousemove", (ev) => placeEnvTip(ev.originalEvent)).on("mouseout", off);
+      poly._envOn = on; poly._envOff = off;
       poly.addTo(layer);
     }
   }
@@ -442,7 +470,7 @@
 
   function fitToSelection(sel) {
     const ll = [];
-    sel.mesos.forEach((mi) => M[mi].pts.forEach((p) => { if (p[0] >= win[0] && p[0] <= win[1]) ll.push([p[1], p[2]]); }));
+    sel.mesos.forEach((mi) => { if (!scShow || scShow.has(M[mi].sc)) M[mi].pts.forEach((p) => { if (p[0] >= win[0] && p[0] <= win[1]) ll.push([p[1], p[2]]); }); });
     sel.paths.forEach((ti) => T[ti].drawn.forEach((g) => ll.push(...g.path)));
     if (ll.length) map.fitBounds(L.latLngBounds(ll), { padding: [30, 30], maxZoom: 10 });
   }
@@ -831,6 +859,7 @@
   $("dayRows").addEventListener("click", (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
     const r = dayStats.find((d) => d.ci === +tr.dataset.ci);
+    setScShow(null);
     zoomToEvent(r.t0, r.t1);
     $("daySelect").value = r.ci;
   });
@@ -871,7 +900,7 @@
   $("tStart").addEventListener("change", () => setWindow(fromInput($("tStart").value), win[1]));
   $("tEnd").addEventListener("change", () => setWindow(win[0], fromInput($("tEnd").value)));
   $("allBtn2").addEventListener("click", () => $("allBtn").click());
-  $("allBtn").addEventListener("click", () => { $("daySelect").value = ""; $("yearSelect").value = ""; setRange(lo, hi); setWindow(lo, hi, { fit: true }); });
+  $("allBtn").addEventListener("click", () => { setScShow(null); $("daySelect").value = ""; $("yearSelect").value = ""; setRange(lo, hi); setWindow(lo, hi, { fit: true }); });
 
   dayStats.slice().sort((x, y) => (x.date < y.date ? 1 : -1)).forEach((d) => {
     $("daySelect").insertAdjacentHTML("beforeend", `<option value="${d.ci}">${d.date} — ${d.sc} supercells, ${d.tor} tornadoes</option>`);
@@ -879,7 +908,7 @@
   $("daySelect").addEventListener("change", (e) => {
     if (e.target.value === "") return;
     const d = dayStats.find((x) => x.ci === +e.target.value);
-    $("yearSelect").value = "";
+    $("yearSelect").value = ""; setScShow(null);
     zoomToEvent(d.t0, d.t1);
   });
   [...new Set(C.map((c) => c.date.slice(0, 4)))].sort().reverse().forEach((y) => $("yearSelect").insertAdjacentHTML("beforeend", `<option>${y}</option>`));
@@ -889,6 +918,49 @@
     setRange(lo, hi);
     setWindow(Date.UTC(+e.target.value, 0, 1) / 1000, Date.UTC(+e.target.value + 1, 0, 1) / 1000 - 60, { fit: true });
   });
+  // ---------------------------------------------------------------- supercell picker (map only)
+  function setScShow(set) {
+    scShow = set && set.size < S.length ? set : null;
+    $("scBtn").firstChild.textContent = scShow ? `Supercells: ${scShow.size} shown ` : "Supercells: all ";
+    $("scList").querySelectorAll("input[data-si]").forEach((cb) => (cb.checked = !scShow || scShow.has(+cb.dataset.si)));
+  }
+  const scByDay = {};
+  S.forEach((s, si) => (scByDay[s.case] ||= []).push(si));
+  $("scList").innerHTML = dayStats.slice().sort((x, y) => (x.date < y.date ? 1 : -1)).map((d) =>
+    `<div class="sc-day" data-ci="${d.ci}">${d.date}</div>` + (scByDay[d.ci] || []).sort((x, y) => S[x].t0 - S[y].t0).map((si) => {
+      const s = S[si];
+      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}">${s.label}</button><span class="dim">${s.mesos.length} meso${s.mesos.length > 1 ? "s" : ""}${s.tornadic ? ` · ${s.tors.length} tornado${s.tors.length > 1 ? "es" : ""}` : ""} · ${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
+    }).join("")).join("");
+  const scPanelOpen = (open) => {
+    $("scPanel").hidden = !open; $("scBtn").setAttribute("aria-expanded", open);
+    if (open) {
+      const cur = $("daySelect").value || (S.find((s) => s.t0 <= win[1] && s.t1 >= win[0]) || {}).case;
+      const h = cur != null && $("scList").querySelector(`.sc-day[data-ci="${cur}"]`);
+      if (h) $("scList").scrollTop = h.offsetTop - $("scList").offsetTop;
+    }
+  };
+  $("scBtn").addEventListener("click", (e) => { e.stopPropagation(); scPanelOpen($("scPanel").hidden); });
+  document.addEventListener("click", (e) => { if (!$("scPick").contains(e.target)) scPanelOpen(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") scPanelOpen(false); });
+  $("scList").addEventListener("click", (e) => {
+    const only = e.target.closest("button[data-only]");
+    if (!only) return;
+    e.preventDefault();
+    const si = +only.dataset.only, s = S[si], d = dayStats.find((x) => x.ci === s.case);
+    setScShow(new Set([si]));
+    $("daySelect").value = d.ci; $("yearSelect").value = "";
+    const a = Math.floor((d.t0 - Q) / Q) * Q, b = Math.ceil((d.t1 + Q) / Q) * Q;
+    setRange(a, b); setWindow(a, b);
+    requestAnimationFrame(() => requestAnimationFrame(() => fitToSelection(select())));
+  });
+  $("scList").addEventListener("change", (e) => {
+    const cb = e.target.closest("input[data-si]"); if (!cb) return;
+    const next = new Set(scShow || S.map((_, i) => i));
+    cb.checked ? next.add(+cb.dataset.si) : next.delete(+cb.dataset.si);
+    setScShow(next); render();
+  });
+  $("scAll").addEventListener("click", () => { setScShow(null); render(); });
+
   ["showNon", "showTorM", "showPaths"].forEach((id) => $(id).addEventListener("change", () => render()));
   $("showEnv").addEventListener("change", async () => { if ($("showEnv").checked) await loadEnv(); render(); });
   $("fitBtn").addEventListener("click", () => fitToSelection(select()));

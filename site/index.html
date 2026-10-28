@@ -42,6 +42,13 @@
       <span class="utc">UTC</span>
     </div>
     <div class="presets">
+      <div class="sc-pick" id="scPick">
+        <button id="scBtn" aria-haspopup="true" aria-expanded="false" aria-controls="scPanel">Supercells: all <span aria-hidden="true">▾</span></button>
+        <div class="sc-panel" id="scPanel" hidden>
+          <div class="sc-panel-head"><span>Click a name to show only that supercell; tick boxes to add or remove others.</span><button id="scAll">Show all</button></div>
+          <div class="sc-list" id="scList"></div>
+        </div>
+      </div>
       <select id="daySelect" aria-label="Jump to a day"><option value="">Jump to a day…</option></select>
       <select id="yearSelect" aria-label="Year"><option value="">Year…</option></select>
       <button id="allBtn">All days</button>

@@ -270,3 +270,25 @@ footer a { color: var(--ink-2); }
 .env-tip .env-params td:last-child { color: var(--ink); font-variant-numeric: tabular-nums; }
 .env-tip .dim { color: var(--muted); }
 @media (max-width: 560px) { .env-tip .env-plots { flex-direction: column; } }
+
+/* meso ID labels on the map */
+.trk-label { white-space: nowrap; pointer-events: none; }
+.trk-label span { font: 700 11.5px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .02em;
+  text-shadow: 0 0 2px var(--surface), 0 0 2px var(--surface), 0 0 3px var(--surface), 0 0 4px var(--surface); }
+
+/* supercell picker */
+.sc-pick { position: relative; }
+#scBtn { white-space: nowrap; }
+.sc-panel { position: absolute; z-index: 3000; left: 0; top: calc(100% + 6px); width: 340px; max-width: calc(100vw - 32px);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.22); }
+.sc-panel[hidden] { display: none; }
+.sc-panel-head { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--ring); font-size: 12px; color: var(--muted); }
+.sc-panel-head button { flex: none; padding: 4px 10px; }
+.sc-list { max-height: 360px; overflow-y: auto; padding: 4px 0 6px; }
+.sc-day { position: sticky; top: 0; background: var(--surface-2); padding: 4px 10px; font-size: 12px; font-weight: 650; color: var(--ink-2); }
+.sc-row { display: flex; align-items: center; gap: 7px; padding: 2px 10px; font-size: 12.5px; cursor: pointer; }
+.sc-row:hover { background: var(--surface-2); }
+.sc-row i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.sc-row button { border: 0; background: none; padding: 1px 2px; font-weight: 650; color: var(--ink); min-width: 2.2em; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.sc-row button:hover { color: var(--tor); }
+.sc-row .dim { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }

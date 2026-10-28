@@ -125,7 +125,13 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   of the hour, outlined and lightly filled in its track's color. Hovering a slice shows its inflow
   sounding as a Skew-T and a 0–10 km hodograph (observed and Bunkers right-mover motions marked), with
   surface T/Td, MLCAPE/MLCIN, MLLCL and effective SRH. The page loads these from `site/env.json`
-  only when the box is first checked.
+  only when the box is first checked. A dot marks each slice's apex on its parent track; hovering a slice
+  or dot also highlights the parent supercell.
+- **Meso IDs on the map** (e.g. `A1`, in the track's color, at the start of each track) whenever the
+  window spans about a day or less — e.g. after picking a day.
+- **Supercells** menu (left of "Jump to a day"): lists every supercell, grouped by day. Click a name to
+  jump to its day and show only that supercell on the map; tick or untick boxes to add or remove others;
+  "Show all" (or picking a day / "All days") brings everything back. This filters the map only.
 
 Everything except the map shows **whole supercells active at any point in the window**.
 The map shows only the parts of each track inside the window.
