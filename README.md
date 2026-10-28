@@ -117,7 +117,7 @@ cd site && python -m http.server 8000      # open http://localhost:8000
 - Light and dark themes (follows the system setting; the button toggles).
 - **AzShear** button (upper right of the map): colors each mesocyclone track by MRMS peak AzShear
   from `tracks-AzShear/` — choose Low-level (0–2 km AGL) or Mid-level (3–6 km AGL). Track outlines
-  stay red/blue (tornadic/nontornadic); the fill uses the plasma colormap on a fixed 0–20
+  stay red/blue (tornadic/nontornadic); the fill uses the plasma colormap on a fixed 0–15
   (×10⁻³ s⁻¹) scale, gray where MRMS has no data. Off by default.
 
 Everything except the map shows **whole supercells active at any point in the window**.

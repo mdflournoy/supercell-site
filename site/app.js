@@ -152,7 +152,7 @@
 
   // ---- AzShear coloring (MRMS peak AzShear within 2 km, 1e-3 s^-1), plasma colormap
   const PLASMA = ["#0d0887", "#41049d", "#6a00a8", "#8f0da4", "#b12a90", "#cc4778", "#e16462", "#f2844b", "#fca636", "#fcce25", "#f0f921"];
-  const AZ_MAX = 20;           // top of the color scale (values above are drawn at the top color)
+  const AZ_MAX = 15;           // top of the color scale (values above are drawn at the top color)
   const AZ_LEVELS = { lo: { idx: 3, name: "Low-level", layer: "0–2 km AGL" }, mid: { idx: 4, name: "Mid-level", layer: "3–6 km AGL" } };
   let azMode = null;           // null (off) | "lo" | "mid"
   const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -268,9 +268,9 @@
     if (showPaths) {
       for (const ti of sel.paths) {
         const t = T[ti];
-        const tip = `<b>${efLabel(t.ef)} tornado</b>${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}<br>${fmtT(t.t0)}–${fmtHM(t.t1)}<br>${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.wid ? ` · max ${t.wid} yd` : ""}`;
+        const tip = `<b>${efLabel(t.ef)} tornado</b> <b>(${t.mlabels})</b>${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}<br>${fmtT(t.t0)}–${fmtHM(t.t1)}<br>${t.where}${t.len != null ? ` · ${t.len} mi` : ""}${t.wid ? ` · max ${t.wid} yd` : ""}`;
         const segRows = t.segs.map((g) => `<tr><td><span class="ef-chip">${efLabel(g.ef)}</span></td><td>${fmtHM(g.t0)}–${fmtHM(g.t1)} · ${g.where}${g.len != null ? ` · ${g.len} mi` : ""} · <a href="${nceiLink(g.event)}" target="_blank" rel="noopener">${g.event}</a>${t.linked.includes(g.event) ? " ◂ linked" : ""}${g.path ? "" : " (no location)"}</td></tr>`).join("");
-        const pop = `<div class="pop"><h3>${efLabel(t.ef)} tornado${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}</h3><div class="meta">Meso ${t.mlabels} · supercell ${S[t.sc].label} · ${S[t.sc].date}</div><table>
+        const pop = `<div class="pop"><h3>${efLabel(t.ef)} tornado (${t.mlabels})${t.segs.length > 1 ? ` · ${t.segs.length} segments` : ""}</h3><div class="meta">Meso ${t.mlabels} · supercell ${S[t.sc].label} · ${S[t.sc].date}</div><table>
             <tr><td>Time</td><td>${fmtT(t.t0)} → ${fmtHM(t.t1)} (${dur((t.t1 - t.t0) / 60)})</td></tr><tr><td>Location</td><td>${t.where}</td></tr>
             <tr><td>Path</td><td>${t.len ?? "—"} mi total · max width ${t.wid ?? "—"} yd</td></tr><tr><td>Casualties</td><td>${t.inj} injuries, ${t.dth} deaths</td></tr>
             ${t.partial ? `<tr><td>Note</td><td>From NCEI only; other segments may exist</td></tr>` : ""}
