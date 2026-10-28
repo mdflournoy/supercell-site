@@ -131,7 +131,8 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   window spans about a day or less — e.g. after picking a day.
 - **Supercells** menu (left of "Jump to a day"): appears once a day is selected (dropdown or Days table)
   and lists that day's supercells. Click a letter to show only that supercell on the map; tick or untick
-  boxes to add or remove others; "Show all", another day, or "All days" brings everything back. It
+  boxes to add or remove others; "Remove all" clears the map; "Show all", another day, or "All days"
+  brings everything back. It
   disappears if the window moves off that day. This filters the map only.
 
 Everything except the map shows **whole supercells active at any point in the window**.

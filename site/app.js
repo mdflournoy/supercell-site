@@ -936,7 +936,7 @@
     scPanelOpen(false);
     $("scList").innerHTML = pickDay == null ? "" : (scByDay[pickDay] || []).map((si) => {
       const s = S[si];
-      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}">${s.label}</button><span class="dim">${s.mesos.length} meso${s.mesos.length > 1 ? "s" : ""}${s.tornadic ? ` · ${s.tors.length} tornado${s.tors.length > 1 ? "es" : ""}` : ""} · ${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
+      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}" title="Show only supercell ${s.label}">${s.label}</button></label>`;
     }).join("");
     setScShow(null);
   }
@@ -958,6 +958,7 @@
     setScShow(next); render();
   });
   $("scAll").addEventListener("click", () => { setScShow(null); render(); });
+  $("scNone").addEventListener("click", () => { setScShow(new Set()); render(); });
   // drop the event selection (and the picker) once the window no longer overlaps that day
   function checkPickDay() {
     if (pickDay == null) return;
