@@ -1068,7 +1068,7 @@
       const svg = violinSVG(groups, u);
       const md = (gr) => (gr.stats.med == null ? "—" : nf(gr.stats.med, Math.abs(gr.stats.med) < 100 ? 1 : 0));
       envStatsCache[vi] = { groups, label, u };
-      return `<div class="card violin-card" data-vi="${vi}"><h2>${label}</h2><p class="hint">${u} · median ${md(groups[0])} tornadic vs ${md(groups[2])} nontornadic</p>${svg}</div>`;
+      return `<div class="card violin-card" data-vi="${vi}"><h2>${label} <span class="unit">(${u})</span></h2><p class="hint">Medians: <span style="color:${torC};font-weight:600">${md(groups[0])}</span> vs. <span style="color:${nonC};font-weight:600">${md(groups[2])}</span></p>${svg}</div>`;
     }).join("");
   }
   const envStatsCache = {};
