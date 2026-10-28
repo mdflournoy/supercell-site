@@ -229,10 +229,11 @@
 
   function drawMap(sel) {
     layer.clearLayers(); scLines = {}; scTors = {};
-    const [a, b] = win, clip = $("clipTracks").checked;
+    const [a, b] = win, clip = true;
     const showNon = $("showNon").checked, showTor = $("showTorM").checked, showPaths = $("showPaths").checked;
     const surface = css("--surface"), nonC = css("--nontor"), torC = css("--tor"), pathC = css("--torpath");
     const order = sel.mesos.slice().sort((x, y) => M[x].tornadic - M[y].tornadic); // tornadic on top
+    if ($("showEnv").checked && ENV) drawEnv(sel, a, b, showNon, showTor, torC, nonC);
     for (const mi of order) {
       const m = M[mi];
       if (m.tornadic ? !showTor : !showNon) continue;
@@ -301,9 +302,147 @@
     }
   }
 
+  // ---------------------------------------------------------------- HRRR inflow environments
+  let ENV = null, envLoading = null;
+  async function loadEnv() {
+    if (ENV) return ENV;
+    envLoading ||= fetch("env.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((e) => (ENV = e)).catch((err) => { console.warn("env.json:", err); ENV = []; return ENV; });
+    return envLoading;
+  }
+  const ENV_R = 40, ENV_HALF = 45; // km, degrees (matches scripts/hrrr_env.py)
+  function wedge(lat, lon, dir) {
+    const pts = [[lat, lon]], kx = 111.2 * Math.cos(lat * Math.PI / 180);
+    for (let b = dir - ENV_HALF; b <= dir + ENV_HALF + 1e-6; b += 5) {
+      const r = b * Math.PI / 180;
+      pts.push([lat + ENV_R * Math.cos(r) / 111.2, lon + ENV_R * Math.sin(r) / kx]);
+    }
+    return pts;
+  }
+  function drawEnv(sel, a, b, showNon, showTor, torC, nonC) {
+    const want = new Set(sel.mesos);
+    const recs = ENV.filter((e) => want.has(e.m) && e.t >= a - 1800 && e.t <= b + 1800 && e.dir != null)
+      .sort((x, y) => M[x.m].tornadic - M[y.m].tornadic);
+    for (const e of recs) {
+      const m = M[e.m];
+      if (m.tornadic ? !showTor : !showNon) continue;
+      const c = m.tornadic ? torC : nonC;
+      const poly = L.polygon(wedge(e.lat, e.lon, e.dir), { renderer, color: c, weight: 1.25, opacity: 0.9, fillColor: c, fillOpacity: 0.3, _w: 1.25 });
+      poly.on("mouseover", (ev) => { poly.setStyle({ weight: 3, fillOpacity: 0.45 }); showEnvTip(e, ev.originalEvent); })
+        .on("mousemove", (ev) => placeEnvTip(ev.originalEvent))
+        .on("mouseout", () => { poly.setStyle({ weight: 1.25, fillOpacity: 0.3 }); envTip.style.opacity = 0; envTip.style.visibility = "hidden"; });
+      poly.addTo(layer);
+    }
+  }
+
+  const envTip = document.createElement("div");
+  envTip.className = "env-tip";
+  document.body.appendChild(envTip);
+  function placeEnvTip(oe) {
+    if (!oe) return;
+    const w = envTip.offsetWidth, h = envTip.offsetHeight, vw = document.documentElement.clientWidth, vh = window.innerHeight, g = 16;
+    let x = oe.clientX + g, y = oe.clientY - h / 2;
+    if (x + w > vw - 8) x = oe.clientX - g - w;
+    if (x < 8) x = Math.max(8, Math.min(vw - w - 8, oe.clientX - w / 2));
+    y = Math.max(8, Math.min(vh - h - 8, y));
+    envTip.style.left = `${x + window.scrollX}px`; envTip.style.top = `${y + window.scrollY}px`;
+  }
+  const f0 = (v, u = "") => (v == null ? "—" : `${Math.round(v)}${u}`);
+  const f1 = (v) => (v == null ? "—" : v.toFixed(1));
+  function showEnvTip(e, oe) {
+    const m = M[e.m], s = S[m.sc];
+    const cF = (c) => (c == null ? "" : ` (${Math.round(c * 9 / 5 + 32)}°F)`);
+    envTip.innerHTML = `<div class="env-head"><b>${s.date} · ${m.label}</b> · HRRR inflow sounding valid ${fmtT(e.t)}${e.prev ? " (hour before meso formed)" : ""}</div>
+      <div class="env-plots">${skewT(e.prof)}${hodo(e.prof, e.obs, e.rm)}</div>
+      <table class="env-params">
+        <tr><td>T / T<sub>d</sub></td><td>${f1(e.T)} / ${f1(e.Td)} °C</td></tr>
+        <tr><td>MLCAPE / MLCIN</td><td>${f0(e.mlcape)} / ${f0(e.mlcin)} J kg⁻¹</td></tr>
+        <tr><td>MLLCL</td><td>${f0(e.mllcl)} m AGL</td></tr>
+        <tr><td>ESRH</td><td>${f0(e.esrh)} m² s⁻² <span class="dim">(obs. motion)</span> · ${f0(e.esrh_b)} <span class="dim">(Bunkers RM)</span></td></tr>
+      </table>`;
+    envTip.style.visibility = "visible"; envTip.style.opacity = 1;
+    placeEnvTip(oe);
+  }
+
+  // Skew-T log-p (SVG). Isotherms skewed 45°, 1050–100 hPa.
+  function skewT(prof) {
+    const W = 230, H = 250, P0 = 1050, P1 = 100, TL = -40, TR = 40;
+    const lnr = Math.log(P0 / P1), yb = (p) => H * Math.log(P0 / p) / lnr; // height above bottom
+    const X = (t, p) => (t - TL) / (TR - TL) * W + yb(p), Y = (p) => H - yb(p);
+    const ink = css("--ink"), grid = css("--grid"), muted = css("--muted"), axis = css("--axis");
+    let g = "";
+    for (let t = -120; t <= 40; t += 10) g += `<line x1="${X(t, P0)}" y1="${H}" x2="${X(t, P1)}" y2="0" stroke="${t === 0 ? muted : grid}" stroke-width="${t === 0 ? 1 : 0.8}"${t === 0 ? ' stroke-dasharray="3 3"' : ""}/>`;
+    // dry adiabats (theta = 250..450 K)
+    for (let th = 250; th <= 450; th += 20) {
+      let d = "";
+      for (let p = P0; p >= P1; p -= 25) d += `${d ? "L" : "M"}${X(th * Math.pow(p / 1000, 0.2857) - 273.15, p).toFixed(1)},${Y(p).toFixed(1)}`;
+      g += `<path d="${d}" fill="none" stroke="${grid}" stroke-width="0.6" stroke-dasharray="5 3"/>`;
+    }
+    let labels = "";
+    for (const p of [1000, 850, 700, 500, 300, 200, 100]) {
+      g += `<line x1="0" x2="${W}" y1="${Y(p)}" y2="${Y(p)}" stroke="${grid}" stroke-width="0.8"/>`;
+      labels += `<text x="-3" y="${Y(p) + 3.5}" text-anchor="end">${p}</text>`;
+    }
+    for (const t of [-30, -20, -10, 0, 10, 20, 30]) labels += `<text x="${X(t, P0)}" y="${H + 11}" text-anchor="middle">${t}</text>`;
+    const line = (k) => prof.filter((r) => r[1] != null && r[k] != null).map((r, i) => `${i ? "L" : "M"}${X(r[k], r[1]).toFixed(1)},${Y(r[1]).toFixed(1)}`).join("");
+    return `<svg class="skewt" viewBox="-28 -4 ${W + 32} ${H + 32}" width="${W + 32}" height="${H + 32}" role="img" aria-label="Skew-T">
+      <defs><clipPath id="skc"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath></defs>
+      <g clip-path="url(#skc)">${g}<path d="${line(3)}" fill="none" stroke="#2ca02c" stroke-width="2"/><path d="${line(2)}" fill="none" stroke="#e03131" stroke-width="2"/></g>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="none" stroke="${axis}"/>
+      <g fill="${muted}" font-size="9">${labels}</g>
+      <text x="${W / 2}" y="${H + 24}" text-anchor="middle" font-size="9.5" fill="${muted}"><tspan fill="#e03131" font-weight="600">T</tspan>  <tspan fill="#2ca02c" font-weight="600">T<tspan font-size="7.5" dy="2">d</tspan></tspan><tspan dy="-2">  °C · hPa</tspan></text>
+    </svg>`;
+  }
+
+  // Hodograph (SVG), 0–10 km AGL, colored by layer; storm motions marked.
+  const HODO_LAYERS = [[0, 1000, "#d62728"], [1000, 3000, "#2ca02c"], [3000, 6000, "#e6a700"], [6000, 10000, "#1f77b4"]];
+  function hodo(prof, obs, rm) {
+    const SZ = 236, ink = css("--ink"), grid = css("--grid"), muted = css("--muted"), axis = css("--axis");
+    const pr = prof.filter((r) => r[0] != null && r[4] != null && r[5] != null && r[0] <= 10000);
+    const interp = (z) => {
+      for (let i = 1; i < pr.length; i++) {
+        const a = pr[i - 1], b = pr[i];
+        if (b[0] >= z && a[0] <= z) { const f = (z - a[0]) / ((b[0] - a[0]) || 1); return [z, null, null, null, a[4] + f * (b[4] - a[4]), a[5] + f * (b[5] - a[5])]; }
+      }
+      return null;
+    };
+    // square view fitted to the hodograph, the storm motions and the origin
+    const us = [0, ...pr.map((r) => r[4])], vs = [0, ...pr.map((r) => r[5])];
+    [obs, rm].forEach((v) => { if (v && v[0] != null) { us.push(v[0]); vs.push(v[1]); } });
+    const span = Math.max(20, Math.max(...us) - Math.min(...us), Math.max(...vs) - Math.min(...vs)) + 8;
+    const cu = (Math.max(...us) + Math.min(...us)) / 2, cv = (Math.max(...vs) + Math.min(...vs)) / 2;
+    const k = SZ / span, X = (u) => SZ / 2 + (u - cu) * k, Y = (v) => SZ / 2 - (v - cv) * k;
+    const P = (u, v) => `${X(u).toFixed(1)},${Y(v).toFixed(1)}`;
+    const ring = span > 70 ? 20 : 10, rmax = Math.hypot(Math.max(Math.abs(cu), 1) + span, Math.abs(cv) + span);
+    let g = "";
+    for (let r = ring; r <= rmax; r += ring) {
+      g += `<circle cx="${X(0)}" cy="${Y(0)}" r="${r * k}" fill="none" stroke="${grid}" stroke-width="0.8"/>`;
+      const lx = X(0) + r * k * 0.707, ly = Y(0) - r * k * 0.707;
+      if (lx > 4 && lx < SZ - 12 && ly > 8 && ly < SZ - 2) g += `<text x="${lx + 2}" y="${ly - 2}" font-size="8.5" fill="${muted}">${r}</text>`;
+    }
+    g += `<line x1="0" x2="${SZ}" y1="${Y(0)}" y2="${Y(0)}" stroke="${axis}" stroke-width="0.8"/><line x1="${X(0)}" x2="${X(0)}" y1="0" y2="${SZ}" stroke="${axis}" stroke-width="0.8"/>`;
+    for (const [z0, z1, c] of HODO_LAYERS) {
+      const seg = [interp(z0) || pr[0], ...pr.filter((r) => r[0] > z0 && r[0] < z1), interp(z1)].filter(Boolean);
+      if (seg.length > 1) g += `<polyline points="${seg.map((r) => P(r[4], r[5])).join(" ")}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    }
+    const mark = (v, label, shape) => {
+      if (!v || v[0] == null) return "";
+      const x = X(v[0]), y = Y(v[1]);
+      const sym = shape === "o" ? `<circle cx="${x}" cy="${y}" r="3.5" fill="none" stroke="${ink}" stroke-width="1.6"/>`
+        : `<path d="M${x - 3.5},${y - 3.5}L${x + 3.5},${y + 3.5}M${x - 3.5},${y + 3.5}L${x + 3.5},${y - 3.5}" stroke="${ink}" stroke-width="1.6"/>`;
+      return `${sym}<text x="${shape === "o" ? x - 6 : x + 6}" y="${y + (shape === "o" ? -5 : 11)}" text-anchor="${shape === "o" ? "end" : "start"}" font-size="9.5" font-weight="600" fill="${ink}">${label}</text>`;
+    };
+    g += mark(obs, "Obs", "o") + mark(rm, "RM", "x");
+    const key = HODO_LAYERS.map(([z0, z1, c], i) => `<tspan fill="${c}" font-weight="600">${i ? "  " : ""}${z0 / 1000}–${z1 / 1000}</tspan>`).join("");
+    return `<svg class="hodo" viewBox="-2 -4 ${SZ + 4} ${SZ + 32}" width="${SZ + 4}" height="${SZ + 32}" role="img" aria-label="Hodograph">
+      <defs><clipPath id="hdc"><rect x="0" y="0" width="${SZ}" height="${SZ}"/></clipPath></defs>
+      <g clip-path="url(#hdc)">${g}</g><rect x="0" y="0" width="${SZ}" height="${SZ}" fill="none" stroke="${axis}"/>
+      <text x="${SZ / 2}" y="${SZ + 24}" text-anchor="middle" font-size="9.5" fill="${muted}">${key}<tspan>  km AGL · m s⁻¹</tspan></text></svg>`;
+  }
+
   function fitToSelection(sel) {
     const ll = [];
-    sel.mesos.forEach((mi) => M[mi].pts.forEach((p) => { if (!$("clipTracks").checked || (p[0] >= win[0] && p[0] <= win[1])) ll.push([p[1], p[2]]); }));
+    sel.mesos.forEach((mi) => M[mi].pts.forEach((p) => { if (p[0] >= win[0] && p[0] <= win[1]) ll.push([p[1], p[2]]); }));
     sel.paths.forEach((ti) => T[ti].drawn.forEach((g) => ll.push(...g.path)));
     if (ll.length) map.fitBounds(L.latLngBounds(ll), { padding: [30, 30], maxZoom: 10 });
   }
@@ -664,7 +803,7 @@
     upsert("barEF", "bar", { labels: efLabels, datasets: [barDs(efCounts, efLabels.map((l) => (l === "Pending" ? css("--muted") : css("--tor"))), "Tornadoes")] }, o5);
 
     // window note
-    $("windowNote").textContent = `${fmtT(win[0])} → ${fmtT(win[1])} · ${scs.length} supercell${scs.length === 1 ? "" : "s"} active in window. Charts summarize those whole storms; the map shows track segments ${$("clipTracks").checked ? "inside the window only" : "for the full life of each meso"}.`;
+    $("windowNote").textContent = `${fmtT(win[0])} → ${fmtT(win[1])} · ${scs.length} supercell${scs.length === 1 ? "" : "s"} active in window. Charts summarize those whole storms; the map shows track segments inside the window only.`;
     location.replace(`#t=${win[0]},${win[1]}` + (range[0] !== lo || range[1] !== hi ? `&r=${range[0]},${range[1]}` : ""));
     renderDays();
   }
@@ -750,7 +889,8 @@
     setRange(lo, hi);
     setWindow(Date.UTC(+e.target.value, 0, 1) / 1000, Date.UTC(+e.target.value + 1, 0, 1) / 1000 - 60, { fit: true });
   });
-  ["showNon", "showTorM", "showPaths", "clipTracks"].forEach((id) => $(id).addEventListener("change", () => render()));
+  ["showNon", "showTorM", "showPaths"].forEach((id) => $(id).addEventListener("change", () => render()));
+  $("showEnv").addEventListener("change", async () => { if ($("showEnv").checked) await loadEnv(); render(); });
   $("fitBtn").addEventListener("click", () => fitToSelection(select()));
 
   // theme

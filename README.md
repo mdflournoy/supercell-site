@@ -120,8 +120,15 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   stay red/blue (tornadic/nontornadic); the fill uses the plasma colormap on a fixed 0–15
   (×10⁻³ s⁻¹) scale, gray where MRMS has no data. Off by default.
 
+- **Environments** checkbox (above the map, off by default): draws each HRRR inflow slice from
+  `env-params/` — a 40 km, 90° wedge centered on the inflow direction at the meso's position at each top
+  of the hour, outlined and lightly filled in its track's color. Hovering a slice shows its inflow
+  sounding as a Skew-T and a 0–10 km hodograph (observed and Bunkers right-mover motions marked), with
+  surface T/Td, MLCAPE/MLCIN, MLLCL and effective SRH. The page loads these from `site/env.json`
+  only when the box is first checked.
+
 Everything except the map shows **whole supercells active at any point in the window**.
-The map can clip tracks to the window ("Clip to window").
+The map shows only the parts of each track inside the window.
 
 ## Renumbered track files (`tracks/`)
 

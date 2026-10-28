@@ -67,6 +67,8 @@ def main() -> None:
     ap.add_argument("--ncei-local", default=None, help="folder of pre-downloaded NCEI details files (testing)")
     ap.add_argument("--tordb-dir", default=None, help="extra folder to search for the tornado database CSV")
     ap.add_argument("--azshear-dir", default=None, help="folder of MRMS AzShear series (tracks-AzShear/)")
+    ap.add_argument("--env-params", default=None, help="folder of HRRR inflow parameters (env-params/)")
+    ap.add_argument("--env-profiles", default=None, help="folder of HRRR inflow soundings (env-profiles/)")
     a = ap.parse_args()
 
     allcsv = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv" and p.name != "id_map.csv")
@@ -163,6 +165,56 @@ def main() -> None:
                                    for r in g.sort_values("t").itertuples()]
                 n_az += 1
         print(f"AzShear series attached to {n_az} of {len(mesos)} mesocyclones")
+
+    # HRRR inflow environments -> site/env.json (loaded by the page only when "Environments" is on)
+    if a.env_params and Path(a.env_params).is_dir():
+        lookup = {}
+        for mi, m in enumerate(mesos):
+            s_ = supercells[m["sc"]]
+            lookup[(cases[s_["case"]]["file"][:8], m["label"].upper())] = mi
+        def fnum(v, nd=1):
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                return None
+            return None if v != v else round(v, nd)
+        env = []
+        for f in sorted(Path(a.env_params).glob("*.csv")):
+            event = f.stem
+            try:
+                ep = pd.read_csv(f, dtype={"meso_id": str, "time_utc": str})
+            except Exception as e:  # noqa: BLE001
+                problems.append(f"{f.name}: env-params file unreadable ({e})")
+                continue
+            for r in ep.to_dict("records"):
+                mid = str(r["meso_id"]).strip().upper()
+                mi = lookup.get((event, mid))
+                if mi is None:
+                    continue
+                hhmm = str(r["time_utc"]).zfill(4)
+                t = int(pd.Timestamp(f"{r['date']}T{hhmm[:2]}:{hhmm[2:]}Z").timestamp())
+                prof = []
+                pf = Path(a.env_profiles or "") / f"{event}_{mid}_{hhmm}_profile.csv"
+                if a.env_profiles and pf.exists():
+                    try:
+                        pr = pd.read_csv(pf, skiprows=1)
+                        prof = [[fnum(x.height_agl_m, 0), fnum(x.pressure_hpa, 1), fnum(x.temperature_c, 1),
+                                 fnum(x.dewpoint_c, 1), fnum(x.u_ms, 1), fnum(x.v_ms, 1)] for x in pr.itertuples()]
+                    except Exception as e:  # noqa: BLE001
+                        problems.append(f"{pf.name}: profile unreadable ({e})")
+                env.append({
+                    "m": mi, "t": t, "lat": fnum(r["lat"], 4), "lon": fnum(r["lon"], 4), "dir": fnum(r["slice_dir"], 1),
+                    "prev": str(r.get("prev_hour", "")).strip().lower() == "yes",
+                    "T": fnum(r.get("t_sfc")), "Td": fnum(r.get("td_sfc")),
+                    "mlcape": fnum(r.get("mlcape"), 0), "mlcin": fnum(r.get("mlcin"), 0), "mllcl": fnum(r.get("mllcl"), 0),
+                    "esrh": fnum(r.get("esrh_obs"), 0), "esrh_b": fnum(r.get("esrh_bunk"), 0),
+                    "obs": [fnum(r.get("obs_u")), fnum(r.get("obs_v"))],
+                    "rm": [fnum(r.get("bunk_rm_u")), fnum(r.get("bunk_rm_v"))],
+                    "prof": prof,
+                })
+        env_out = Path(a.out).with_name("env.json")
+        env_out.write_text(json.dumps(env, separators=(",", ":")).replace("NaN", "null"))
+        print(f"HRRR environments: {len(env)} meso-hours -> {env_out} ({env_out.stat().st_size/1e6:.1f} MB)")
 
     for s in supercells:
         ts = [p[0] for mi in s["mesos"] for p in mesos[mi]["pts"]]

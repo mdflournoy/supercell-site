@@ -84,8 +84,8 @@ jobs:
         continue-on-error: true   # never block the site deploy; unfinished hours resume next run
         run: python scripts/hrrr_env.py --tracks tracks --profiles env-profiles --params env-params --cache env-cache/cache.jsonl --status env-cache/status.json --max-minutes 150
 
-      - name: Build data.json from the renumbered files (+ AzShear series)
-        run: python scripts/build_data.py --raw tracks --tordb-dir data/raw --azshear-dir tracks-AzShear --out site/data.json
+      - name: Build data.json (+ AzShear series) and env.json (HRRR environments)
+        run: python scripts/build_data.py --raw tracks --tordb-dir data/raw --azshear-dir tracks-AzShear --env-params env-params --env-profiles env-profiles --out site/data.json
 
       - name: Save renumbered + AzShear files to the repo
         if: ${{ !cancelled() }}
