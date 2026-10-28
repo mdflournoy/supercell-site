@@ -434,6 +434,8 @@
     srf500: ["500 m storm-relative wind", "m s⁻¹"], srf1: ["1 km storm-relative wind", "m s⁻¹"], srf3: ["3 km storm-relative wind", "m s⁻¹"],
     srf13: ["1–3 km mean storm-relative wind", "m s⁻¹"], srf01: ["0–1 km mean storm-relative wind", "m s⁻¹"],
     sw500: ["0–500 m streamwise vorticity", "s⁻¹"], cw500: ["0–500 m crosswise vorticity", "s⁻¹"], psw500: ["0–500 m % streamwise vorticity", "%"],
+    mws100: ["0–100 m mean wind speed", "m s⁻¹"], mws250: ["0–250 m mean wind speed", "m s⁻¹"], mws500: ["0–500 m mean wind speed", "m s⁻¹"],
+    mws1: ["0–1 km mean wind speed", "m s⁻¹"], mws3: ["0–3 km mean wind speed", "m s⁻¹"],
     crit_angle: ["Critical angle", "°"], stp_fixed: ["STP (fixed layer)", ""], stp_eff: ["STP (effective layer)", ""], stp500: ["STP (500 m)", ""], scp: ["SCP", ""],
   };
   function paramInfo(col) {
@@ -957,6 +959,8 @@
     ["mlcape", "MLCAPE", "J kg⁻¹"], ["mlcin", "MLCIN", "J kg⁻¹"], ["mllcl", "MLLCL", "m AGL"], ["mllfc", "MLLFC", "m AGL"],
     ["srh500_obs", "0–500 m SRH", "m² s⁻²"], ["srh1_obs", "0–1 km SRH", "m² s⁻²"], ["srh3_obs", "0–3 km SRH", "m² s⁻²"],
     ["bwd500", "0–500 m bulk shear", "m s⁻¹"], ["bwd1", "0–1 km bulk shear", "m s⁻¹"], ["bwd6", "0–6 km bulk shear", "m s⁻¹"],
+    ["mws100", "0–100 m mean wind", "m s⁻¹"], ["mws250", "0–250 m mean wind", "m s⁻¹"], ["mws500", "0–500 m mean wind", "m s⁻¹"],
+    ["mws1", "0–1 km mean wind", "m s⁻¹"], ["mws3", "0–3 km mean wind", "m s⁻¹"],
   ];
   function envSample(sel) {
     const mode = $("envClass").value, subset = $("envSubset").value;

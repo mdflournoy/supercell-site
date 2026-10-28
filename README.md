@@ -144,7 +144,8 @@ cd site && python -m http.server 8000      # open http://localhost:8000
 
 - Below the map, two tabs: **General stats** (the charts above) and **Environments**: violin plots of
   MLCAPE, MLCIN, MLLCL, MLLFC, 0–500 m / 0–1 km / 0–3 km SRH (observed motion) and 0–500 m / 0–1 km / 0–6 km
-  bulk shear for the HRRR inflow environments of supercells active in the window — tornadic (red), all
+  bulk shear, and 0–100 m / 0–250 m / 0–500 m / 0–1 km / 0–3 km mean ground-relative wind speed
+  (from the lowest model level, ~10 m AGL, computed by the site build from `env-profiles/`) for the HRRR inflow environments of supercells active in the window — tornadic (red), all
   (gray) and nontornadic (blue), each with its median (dot) and interquartile range (bar). Controls:
   *Times* — All hourly environments, Initial (first hour of each storm) or Strongest (the hour nearest
   each storm's peak low- or mid-level AzShear, or for tornadic storms optionally its strongest tornado's

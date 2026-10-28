@@ -59,6 +59,26 @@ def parse_file(path: Path) -> tuple[pd.DataFrame, list[tuple[str, str]], str]:
     return df, links, day
 
 
+# mean ground-relative wind speed in layers from the lowest model level (~10 m AGL) up to the top height
+MWS_LAYERS = {"mws100": 100, "mws250": 250, "mws500": 500, "mws1": 1000, "mws3": 3000}
+
+
+def layer_mean_speeds(pr):
+    import numpy as np
+    z = pr["height_agl_m"].to_numpy(float)
+    u, v = pr["u_ms"].to_numpy(float), pr["v_ms"].to_numpy(float)
+    ok = np.isfinite(z) & np.isfinite(u) & np.isfinite(v)
+    z, u, v = z[ok], u[ok], v[ok]
+    out = {}
+    for name, top in MWS_LAYERS.items():
+        if len(z) < 2 or z[0] >= top or z[-1] < top:
+            out[name] = None
+            continue
+        zz = np.arange(z[0], top + 1e-6, 5.0)
+        out[name] = float(np.mean(np.hypot(np.interp(zz, z, u), np.interp(zz, z, v))))
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", default="data/raw")
@@ -173,7 +193,7 @@ def main() -> None:
                 "grw500", "grw1", "grw6", "grw05_3", "bwd500", "bwd1", "bwd3", "bwd6", "bwd13", "ebwd"] + [
         f"{n}_{t}" for n in ["srh500", "srh1", "srh3", "srh13", "esrh", "srf500", "srf1", "srf3", "srf13", "srf01",
                              "sw500", "cw500", "psw500", "crit_angle", "stp_fixed", "stp_eff", "stp500", "scp"]
-        for t in ("obs", "bunk")]
+        for t in ("obs", "bunk")] + list(MWS_LAYERS)
     # HRRR inflow environments -> site/env.json (loaded by the page only when "Environments" is on)
     if a.env_params and Path(a.env_params).is_dir():
         lookup = {}
@@ -206,13 +226,14 @@ def main() -> None:
                     continue
                 hhmm = str(r["time_utc"]).zfill(4)
                 t = int(pd.Timestamp(f"{r['date']}T{hhmm[:2]}:{hhmm[2:]}Z").timestamp())
-                prof = []
+                prof, derived = [], {}
                 pf = Path(a.env_profiles or "") / f"{event}_{mid}_{hhmm}_profile.csv"
                 if a.env_profiles and pf.exists():
                     try:
                         pr = pd.read_csv(pf, skiprows=1)
                         prof = [[fnum(x.height_agl_m, 0), fnum(x.pressure_hpa, 1), fnum(x.temperature_c, 1),
                                  fnum(x.dewpoint_c, 1), fnum(x.u_ms, 1), fnum(x.v_ms, 1)] for x in pr.itertuples()]
+                        derived = layer_mean_speeds(pr)
                     except Exception as e:  # noqa: BLE001
                         problems.append(f"{pf.name}: profile unreadable ({e})")
                 env.append({
@@ -225,7 +246,7 @@ def main() -> None:
                     "obs": [fnum(r.get("obs_u")), fnum(r.get("obs_v"))],
                     "rm": [fnum(r.get("bunk_rm_u")), fnum(r.get("bunk_rm_v"))],
                     "prof": prof,
-                    "v": [sig(r.get(c)) for c in ENV_COLS],
+                    "v": [sig(derived[c]) if c in derived else sig(r.get(c)) for c in ENV_COLS],
                 })
         env_out = Path(a.out).with_name("env.json")
         env_out.write_text(json.dumps({"cols": ENV_COLS, "recs": env}, separators=(",", ":")).replace("NaN", "null"))
