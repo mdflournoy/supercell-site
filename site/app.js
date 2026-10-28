@@ -936,7 +936,7 @@
     scPanelOpen(false);
     $("scList").innerHTML = pickDay == null ? "" : (scByDay[pickDay] || []).map((si) => {
       const s = S[si];
-      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}" title="Show only supercell ${s.label}">${s.label}</button></label>`;
+      return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}" title="Show only supercell ${s.label}">${s.label}</button><span class="dim">${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
     }).join("");
     setScShow(null);
   }
