@@ -278,6 +278,7 @@ footer a { color: var(--ink-2); }
 
 /* supercell picker */
 .sc-pick { position: relative; }
+.sc-pick[hidden] { display: none; }
 #scBtn { white-space: nowrap; }
 .sc-panel { position: absolute; z-index: 3000; left: 0; top: calc(100% + 6px); width: 340px; max-width: calc(100vw - 32px);
   background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.22); }

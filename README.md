@@ -129,9 +129,10 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   or dot also highlights the parent supercell.
 - **Meso IDs on the map** (e.g. `A1`, in the track's color, at the start of each track) whenever the
   window spans about a day or less — e.g. after picking a day.
-- **Supercells** menu (left of "Jump to a day"): lists every supercell, grouped by day. Click a name to
-  jump to its day and show only that supercell on the map; tick or untick boxes to add or remove others;
-  "Show all" (or picking a day / "All days") brings everything back. This filters the map only.
+- **Supercells** menu (left of "Jump to a day"): appears once a day is selected (dropdown or Days table)
+  and lists that day's supercells. Click a letter to show only that supercell on the map; tick or untick
+  boxes to add or remove others; "Show all", another day, or "All days" brings everything back. It
+  disappears if the window moves off that day. This filters the map only.
 
 Everything except the map shows **whole supercells active at any point in the window**.
 The map shows only the parts of each track inside the window.

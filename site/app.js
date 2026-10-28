@@ -859,7 +859,7 @@
   $("dayRows").addEventListener("click", (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
     const r = dayStats.find((d) => d.ci === +tr.dataset.ci);
-    setScShow(null);
+    setPickDay(r.ci);
     zoomToEvent(r.t0, r.t1);
     $("daySelect").value = r.ci;
   });
@@ -894,13 +894,13 @@
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => { render({ fit: fitNext }); fitNext = false; });
   }
-  slider.noUiSlider.on("slide", (v) => { setWindow(+v[0], +v[1], { fromSlider: true }); $("daySelect").value = ""; $("yearSelect").value = ""; });
+  slider.noUiSlider.on("slide", (v) => { setWindow(+v[0], +v[1], { fromSlider: true }); $("yearSelect").value = ""; checkPickDay(); });
   [$("tStart"), $("tEnd")].forEach((el) => el.min = toInput(lo));
   [$("tStart"), $("tEnd")].forEach((el) => el.max = toInput(hi));
-  $("tStart").addEventListener("change", () => setWindow(fromInput($("tStart").value), win[1]));
-  $("tEnd").addEventListener("change", () => setWindow(win[0], fromInput($("tEnd").value)));
+  $("tStart").addEventListener("change", () => { setWindow(fromInput($("tStart").value), win[1]); checkPickDay(); });
+  $("tEnd").addEventListener("change", () => { setWindow(win[0], fromInput($("tEnd").value)); checkPickDay(); });
   $("allBtn2").addEventListener("click", () => $("allBtn").click());
-  $("allBtn").addEventListener("click", () => { setScShow(null); $("daySelect").value = ""; $("yearSelect").value = ""; setRange(lo, hi); setWindow(lo, hi, { fit: true }); });
+  $("allBtn").addEventListener("click", () => { setPickDay(null); $("daySelect").value = ""; $("yearSelect").value = ""; setRange(lo, hi); setWindow(lo, hi, { fit: true }); });
 
   dayStats.slice().sort((x, y) => (x.date < y.date ? 1 : -1)).forEach((d) => {
     $("daySelect").insertAdjacentHTML("beforeend", `<option value="${d.ci}">${d.date} — ${d.sc} supercells, ${d.tor} tornadoes</option>`);
@@ -908,37 +908,39 @@
   $("daySelect").addEventListener("change", (e) => {
     if (e.target.value === "") return;
     const d = dayStats.find((x) => x.ci === +e.target.value);
-    $("yearSelect").value = ""; setScShow(null);
+    $("yearSelect").value = ""; setPickDay(d.ci);
     zoomToEvent(d.t0, d.t1);
   });
   [...new Set(C.map((c) => c.date.slice(0, 4)))].sort().reverse().forEach((y) => $("yearSelect").insertAdjacentHTML("beforeend", `<option>${y}</option>`));
   $("yearSelect").addEventListener("change", (e) => {
     if (!e.target.value) return;
-    $("daySelect").value = "";
+    $("daySelect").value = ""; setPickDay(null);
     setRange(lo, hi);
     setWindow(Date.UTC(+e.target.value, 0, 1) / 1000, Date.UTC(+e.target.value + 1, 0, 1) / 1000 - 60, { fit: true });
   });
   // ---------------------------------------------------------------- supercell picker (map only)
-  function setScShow(set) {
-    scShow = set && set.size < S.length ? set : null;
-    $("scBtn").firstChild.textContent = scShow ? `Supercells: ${scShow.size} shown ` : "Supercells: all ";
-    $("scList").querySelectorAll("input[data-si]").forEach((cb) => (cb.checked = !scShow || scShow.has(+cb.dataset.si)));
-  }
+  // Appears only once an event (day) is selected, and lists that day's supercells.
   const scByDay = {};
   S.forEach((s, si) => (scByDay[s.case] ||= []).push(si));
-  $("scList").innerHTML = dayStats.slice().sort((x, y) => (x.date < y.date ? 1 : -1)).map((d) =>
-    `<div class="sc-day" data-ci="${d.ci}">${d.date}</div>` + (scByDay[d.ci] || []).sort((x, y) => S[x].t0 - S[y].t0).map((si) => {
+  Object.values(scByDay).forEach((l) => l.sort((x, y) => S[x].t0 - S[y].t0));
+  let pickDay = null;
+  function setScShow(set) {
+    const all = pickDay == null ? [] : scByDay[pickDay];
+    scShow = set && set.size < all.length ? set : null;
+    $("scBtn").firstChild.textContent = scShow ? `Supercells: ${scShow.size} of ${all.length} ` : "Supercells: all ";
+    $("scList").querySelectorAll("input[data-si]").forEach((cb) => (cb.checked = !scShow || scShow.has(+cb.dataset.si)));
+  }
+  function setPickDay(ci) {
+    pickDay = ci == null || ci === "" ? null : +ci;
+    $("scPick").hidden = pickDay == null;
+    scPanelOpen(false);
+    $("scList").innerHTML = pickDay == null ? "" : (scByDay[pickDay] || []).map((si) => {
       const s = S[si];
       return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><button type="button" data-only="${si}">${s.label}</button><span class="dim">${s.mesos.length} meso${s.mesos.length > 1 ? "s" : ""}${s.tornadic ? ` · ${s.tors.length} tornado${s.tors.length > 1 ? "es" : ""}` : ""} · ${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
-    }).join("")).join("");
-  const scPanelOpen = (open) => {
-    $("scPanel").hidden = !open; $("scBtn").setAttribute("aria-expanded", open);
-    if (open) {
-      const cur = $("daySelect").value || (S.find((s) => s.t0 <= win[1] && s.t1 >= win[0]) || {}).case;
-      const h = cur != null && $("scList").querySelector(`.sc-day[data-ci="${cur}"]`);
-      if (h) $("scList").scrollTop = h.offsetTop - $("scList").offsetTop;
-    }
-  };
+    }).join("");
+    setScShow(null);
+  }
+  function scPanelOpen(open) { $("scPanel").hidden = !open; $("scBtn").setAttribute("aria-expanded", open); }
   $("scBtn").addEventListener("click", (e) => { e.stopPropagation(); scPanelOpen($("scPanel").hidden); });
   document.addEventListener("click", (e) => { if (!$("scPick").contains(e.target)) scPanelOpen(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") scPanelOpen(false); });
@@ -946,20 +948,22 @@
     const only = e.target.closest("button[data-only]");
     if (!only) return;
     e.preventDefault();
-    const si = +only.dataset.only, s = S[si], d = dayStats.find((x) => x.ci === s.case);
-    setScShow(new Set([si]));
-    $("daySelect").value = d.ci; $("yearSelect").value = "";
-    const a = Math.floor((d.t0 - Q) / Q) * Q, b = Math.ceil((d.t1 + Q) / Q) * Q;
-    setRange(a, b); setWindow(a, b);
-    requestAnimationFrame(() => requestAnimationFrame(() => fitToSelection(select())));
+    setScShow(new Set([+only.dataset.only]));
+    render({ fit: true });
   });
   $("scList").addEventListener("change", (e) => {
     const cb = e.target.closest("input[data-si]"); if (!cb) return;
-    const next = new Set(scShow || S.map((_, i) => i));
+    const next = new Set(scShow || scByDay[pickDay]);
     cb.checked ? next.add(+cb.dataset.si) : next.delete(+cb.dataset.si);
     setScShow(next); render();
   });
   $("scAll").addEventListener("click", () => { setScShow(null); render(); });
+  // drop the event selection (and the picker) once the window no longer overlaps that day
+  function checkPickDay() {
+    if (pickDay == null) return;
+    const d = dayStats.find((x) => x.ci === pickDay);
+    if (win[1] < d.t0 || win[0] > d.t1) { setPickDay(null); $("daySelect").value = ""; render(); }
+  }
 
   ["showNon", "showTorM", "showPaths"].forEach((id) => $(id).addEventListener("change", () => render()));
   $("showEnv").addEventListener("change", async () => { if ($("showEnv").checked) await loadEnv(); render(); });
