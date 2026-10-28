@@ -149,6 +149,7 @@ def process_hour(valid_iso: str, storms: list[dict]) -> dict:
 
     win_idx = None
     terrain_win = {}
+    grid_relative = True
     with cf.ThreadPoolExecutor(8) as tp:
         for (var, lev, _, _), raw in tp.map(fetch, want):
             nbytes += len(raw)
@@ -163,6 +164,11 @@ def process_hour(valid_iso: str, storms: list[dict]) -> dict:
                     j0, j1 = max(0, j - WIN), min(lat.shape[0], j + WIN + 1)
                     i0, i1 = max(0, i - WIN), min(lat.shape[1], i + WIN + 1)
                     win_idx.append((j0, j1, i0, i1, j - j0, i - i0))
+            if var == "UGRD":
+                try:
+                    grid_relative = bool(msg["uvRelativeToGrid"])
+                except Exception:  # noqa: BLE001
+                    pass
             vals = np.asarray(msg.values, dtype=np.float64)
             for k, (j0, j1, i0, i1, _, _) in enumerate(win_idx):
                 w = vals[j0:j1, i0:i1]
@@ -181,8 +187,11 @@ def process_hour(valid_iso: str, storms: list[dict]) -> dict:
             c = cube[k]
             a = ang[j0:j1, i0:i1]
             ug, vg = c["u"], c["v"]
-            ue = ug * np.cos(a) - vg * np.sin(a)          # grid-relative -> earth-relative
-            ve = ug * np.sin(a) + vg * np.cos(a)
+            if grid_relative:                              # grid-relative -> earth-relative
+                ue = ug * np.cos(a) - vg * np.sin(a)
+                ve = ug * np.sin(a) + vg * np.cos(a)
+            else:
+                ue, ve = ug, vg
             terr = terrain_win.get(k)
             if terr is None:                               # fallback: lowest level ~ 8 m AGL
                 terr = c["z"][0] - 8.0
@@ -229,7 +238,7 @@ def process_hour(valid_iso: str, storms: list[dict]) -> dict:
         except Exception as e:  # noqa: BLE001
             results[st["key"]] = {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()[-800:]}
     return {"valid": valid_iso, "results": results, "bytes": nbytes, "secs": round(time.time() - t0, 1),
-            "nlev": nlev, "terrain": have_terrain}
+            "nlev": nlev, "terrain": have_terrain, "grid_relative_winds": grid_relative}
 
 
 # ----------------------------------------------------------------------------- tracks -> storm-hours
@@ -360,7 +369,7 @@ def main() -> None:
                     done += 1
                     nbytes += res["bytes"]
                     secs.append(res["secs"])
-                    info = {"levels": res["nlev"], "terrain_field": res["terrain"]}
+                    info = {"levels": res["nlev"], "terrain_field": res["terrain"], "grid_relative_winds": res["grid_relative_winds"]}
                 except Exception as e:  # noqa: BLE001
                     failed += 1
                     if len(status["errors"]) < 30:

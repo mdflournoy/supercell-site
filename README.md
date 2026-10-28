@@ -157,3 +157,30 @@ Source: `s3://noaa-mrms-pds/CONUS/MergedAzShear_0-2kmAGL_00.50/` and `..._3-6kmA
 Each MRMS file is processed once; results are cached in `azshear-cache/cache.csv`, so nightly
 runs only fetch what new or edited tracks need. A run spends at most ~4 hours on MRMS and
 resumes where it left off on the next run; `azshear-cache/status.json` summarizes the last run.
+
+## HRRR near-storm environments (`env-profiles/`, `env-params/`)
+
+Following the HRRR-Inflow method of Coffer, Parker, Coniglio & Homeyer (2025, *Wea. Forecasting*),
+for every mesocyclone in `tracks/` at every top of the hour within its tracked lifetime (or the hour
+before it formed, if it never spans one):
+
+- position interpolated to HH:00; observed motion from track positions ±15 min around HH:00;
+- HRRR 00-h analysis valid at HH:00 on **native hybrid levels** (`s3://noaa-hrrr-bdp-pds`,
+  `wrfnatf00`), winds rotated from grid- to earth-relative;
+- a 90° slice (±45°) centered on the 0–1 km storm-relative inflow direction (observed motion; Bunkers
+  right-mover when no observed motion exists), within 40 km of the grid point nearest the storm;
+  θ, qv, p, u, v and height AGL are averaged over the slice into one inflow sounding.
+
+**`env-profiles/YYYYMMDD_<meso>_<HHMM>_profile.csv`** (event date in the name, even after 00 UTC):
+line 1 = event date, valid time, meso ID, lat/lon; line 2 = header; then
+`height_agl_m, pressure_hpa, temperature_c, dewpoint_c, u_ms, v_ms` from the lowest model level to 100 hPa.
+
+**`env-params/YYYYMMDD.csv`**: one row per meso per hour (sorted A1, A2, …, then time) with the
+approved parameter list — SB/ML/MU parcels (ML = lowest 100 hPa, MU searched in lowest 300 hPa),
+0–3 km MLCAPE, ECAPE (ML parcel; Peters et al. 2023), effective inflow layer (Thompson et al. 2007),
+DCAPE, lapse rates, moisture, ground-relative winds, bulk shear, and storm-relative quantities twice
+(`_obs` = observed motion, `_bunk` = Bunkers right-mover): SRH, storm-relative flow, 0–500 m
+streamwise/crosswise vorticity, critical angle, ECAPE, STP (fixed, effective, 500 m) and SCP, plus
+yes/no flags for the paper's filters (MUCAPE = 0, elevated effective inflow base, EBWD < 12.5 m s⁻¹).
+`date`/`time_utc` are the actual valid date/time. Results are cached in `env-cache/`, so each HRRR
+hour is processed once.

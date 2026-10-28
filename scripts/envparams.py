@@ -104,12 +104,18 @@ def _ecape(s: Sounding, sr01: float, cape_ml: float):
     from ecape import calc as ec
     if not np.isfinite(sr01) or not np.isfinite(cape_ml) or cape_ml <= 0 or sr01 <= 0:
         return 0.0 if cape_ml == 0 else NAN
-    zmsl = (s.z + s.terrain) * units.m
-    q = s.q * units("kg/kg")
-    lfc_idx, _ = ec.calc_lfc_height(s.P, zmsl, s.T, s.TD, mpcalc.mixed_parcel)
-    el_idx, el_z = ec.calc_el_height(s.P, zmsl, s.T, s.TD, mpcalc.mixed_parcel)
-    mse_bar, mse_star = ec.calc_mse(s.P, zmsl, s.T, q)
-    arg = ec.calc_integral_arg(mse_bar, mse_star, s.T)
+    # Uniform 50 m grid: the package's mean MSE is an unweighted level average, which equals
+    # Peters et al.'s height average (surface to z) only on evenly spaced levels.
+    zz = np.arange(s.z[0], s.z[-1], 50.0)
+    P = np.exp(np.interp(zz, s.z, s.lnp)) * units.hPa
+    T = np.interp(zz, s.z, s.t) * units.degC
+    q = np.interp(zz, s.z, s.q) * units("kg/kg")
+    TD = mpcalc.dewpoint_from_specific_humidity(P, q)
+    zmsl = (zz + s.terrain) * units.m
+    lfc_idx, _ = ec.calc_lfc_height(P, zmsl, T, TD, mpcalc.mixed_parcel)
+    el_idx, el_z = ec.calc_el_height(P, zmsl, T, TD, mpcalc.mixed_parcel)
+    mse_bar, mse_star = ec.calc_mse(P, zmsl, T, q)
+    arg = ec.calc_integral_arg(mse_bar, mse_star, T)
     ncape = ec.calc_ncape(arg, zmsl, lfc_idx, el_idx)
     psi = ec.calc_psi(el_z)
     e = ec.calc_ecape_a(sr01 * units("m/s"), psi, ncape, cape_ml * units("J/kg"))
