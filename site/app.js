@@ -952,6 +952,150 @@
   $("tabOrder").addEventListener("click", () => setChronoView("order"));
 
   // ---------------------------------------------------------------- selection + render
+  // ---------------------------------------------------------------- Environments tab (violin plots)
+  const VIOLIN_VARS = [
+    ["mlcape", "MLCAPE", "J kg⁻¹"], ["mlcin", "MLCIN", "J kg⁻¹"], ["mllcl", "MLLCL", "m AGL"], ["mllfc", "MLLFC", "m AGL"],
+    ["srh500_obs", "0–500 m SRH", "m² s⁻²"], ["srh1_obs", "0–1 km SRH", "m² s⁻²"], ["srh3_obs", "0–3 km SRH", "m² s⁻²"],
+    ["bwd500", "0–500 m bulk shear", "m s⁻¹"], ["bwd1", "0–1 km bulk shear", "m s⁻¹"], ["bwd6", "0–6 km bulk shear", "m s⁻¹"],
+  ];
+  function envSample(sel) {
+    const mode = $("envClass").value, subset = $("envSubset").value;
+    const peakNon = $("envPeakNon").value, peakTor = $("envPeakTor").value;
+    const scSet = new Set(sel.scs.map((s) => S.indexOf(s)));
+    const recs = ENV.filter((e) => scSet.has(M[e.m].sc));
+    const isTor = (e) => (mode === "sc" ? S[M[e.m].sc].tornadic : M[e.m].tornadic);
+    const keyOf = (e) => (mode === "sc" ? `s${M[e.m].sc}` : `m${e.m}`);
+    if (subset === "all") return { recs, isTor, skipped: 0 };
+    const storms = {};
+    recs.forEach((e) => (storms[keyOf(e)] ||= []).push(e));
+    const out = []; let skipped = 0;
+    for (const [key, list] of Object.entries(storms)) {
+      if (subset === "initial") {
+        out.push(list.reduce((a, b) => (b.t < a.t || (b.t === a.t && M[b.m].t0 < M[a.m].t0) ? b : a)));
+        continue;
+      }
+      // strongest: time of peak AzShear, or of the strongest tornado
+      const mesos = key[0] === "s" ? S[+key.slice(1)].mesos : [+key.slice(1)];
+      const tor = isTor(list[0]), crit = tor ? peakTor : peakNon;
+      let target = null, pref = null;
+      if (crit === "tor") {
+        const tis = uniq(mesos.flatMap((mi) => M[mi].tor)).map((ti) => T[ti]).filter((t) => t.ncei && t.t0 != null);
+        if (tis.length) {
+          const best = tis.reduce((a, b) => {
+            const d = efNum(b.ef) - efNum(a.ef) || (b.len ?? 0) - (a.len ?? 0) || a.t0 - b.t0;
+            return d > 0 ? b : a;
+          });
+          target = best.t0; pref = best.mesos.find((mi) => mesos.includes(mi)) ?? null;
+        }
+      } else {
+        const idx = AZ_LEVELS[crit].idx; let best = -Infinity;
+        for (const mi of mesos) for (const p of M[mi].az || []) if (p[idx] != null && p[idx] > best) { best = p[idx]; target = p[0]; pref = mi; }
+      }
+      if (target == null) { skipped++; continue; }
+      const cands = list.some((e) => e.m === pref) ? list.filter((e) => e.m === pref) : list;
+      out.push(cands.reduce((a, b) => (Math.abs(b.t - target) < Math.abs(a.t - target) ? b : a)));
+    }
+    return { recs: out, isTor, skipped };
+  }
+  function kde(vals, lo, hi, n = 64) {
+    const N = vals.length, mean_ = vals.reduce((a, b) => a + b, 0) / N;
+    const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean_) ** 2, 0) / Math.max(1, N - 1));
+    const sorted = vals.slice().sort((a, b) => a - b), q = (p) => sorted[Math.min(N - 1, Math.floor(p * (N - 1)))];
+    const iqr = q(0.75) - q(0.25);
+    let bw = 1.06 * Math.min(sd, iqr / 1.34 || sd) * Math.pow(N, -0.2);
+    if (!(bw > 0)) bw = (Math.abs(mean_) || 1) * 0.05;
+    const ys = [], ds = [];
+    for (let i = 0; i < n; i++) {
+      const y = lo + (hi - lo) * i / (n - 1); let d = 0;
+      for (const v of vals) { const z = (y - v) / bw; d += Math.exp(-0.5 * z * z); }
+      ys.push(y); ds.push(d);
+    }
+    return { ys, ds, bw };
+  }
+  const quant = (sorted, p) => { if (!sorted.length) return null; const h = (sorted.length - 1) * p, i = Math.floor(h); return sorted[i] + (h - i) * ((sorted[Math.min(i + 1, sorted.length - 1)]) - sorted[i]); };
+  function violinSVG(groups, unit) {
+    const W = 290, H = 236, ml = 42, mr = 6, mt = 8, mb = 34, pw = W - ml - mr, ph = H - mt - mb;
+    const grid = css("--grid"), muted = css("--muted"), axis = css("--axis"), ink = css("--ink"), surf = css("--surface");
+    const allv = groups[1].vals;
+    let lo = Math.min(...allv), hi = Math.max(...allv);
+    if (!allv.length) { lo = 0; hi = 1; }
+    if (hi - lo < 1e-9) { const d = Math.abs(hi) * 0.1 || 1; lo -= d; hi += d; }
+    const st = niceStep(hi - lo, 5), y0 = Math.floor(lo / st) * st, y1 = Math.ceil(hi / st) * st;
+    const Y = (v) => mt + ph - (v - y0) / (y1 - y0) * ph;
+    let g = "";
+    for (let v = y0; v <= y1 + st / 2; v += st) g += `<line x1="${ml}" x2="${ml + pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="${grid}" stroke-width="0.8"/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end" font-size="10" fill="${muted}">${nf(v, Math.max(0, -Math.floor(Math.log10(st) + 1e-9)))}</text>`;
+    const slot = pw / 3, half = slot * 0.42;
+    groups.forEach((gr, gi) => {
+      const cx = ml + slot * (gi + 0.5), sorted = gr.vals.slice().sort((a, b) => a - b);
+      gr.stats = { n: sorted.length, med: quant(sorted, 0.5), q1: quant(sorted, 0.25), q3: quant(sorted, 0.75), mean: sorted.length ? mean(sorted) : null };
+      g += `<text x="${cx}" y="${H - 18}" text-anchor="middle" font-size="11" font-weight="600" fill="${gr.color}">${gr.name}</text><text x="${cx}" y="${H - 6}" text-anchor="middle" font-size="10" fill="${muted}">n = ${sorted.length}</text>`;
+      if (!sorted.length) return;
+      let shape = "", wAt = () => 0;
+      if (sorted.length > 1 && sorted[sorted.length - 1] > sorted[0]) {
+        const { ys, ds } = kde(sorted, sorted[0], sorted[sorted.length - 1]);
+        const dmax = Math.max(...ds), w = ds.map((d) => d / dmax * half);
+        const right = ys.map((y, i) => `${(cx + w[i]).toFixed(1)},${Y(y).toFixed(1)}`), left = ys.map((y, i) => `${(cx - w[i]).toFixed(1)},${Y(y).toFixed(1)}`).reverse();
+        shape = `<polygon class="vio" data-g="${gi}" points="${right.concat(left).join(" ")}" fill="${gr.color}" fill-opacity="${gi === 1 ? 0.28 : 0.35}" stroke="${gr.color}" stroke-width="1.25"/>`;
+        wAt = (v) => { const f = (v - ys[0]) / (ys[ys.length - 1] - ys[0]) * (ys.length - 1), i = Math.max(0, Math.min(ys.length - 2, Math.floor(f))); return w[i] + (f - i) * (w[i + 1] - w[i]); };
+      } else {
+        shape = `<line class="vio" data-g="${gi}" x1="${cx - half / 2}" x2="${cx + half / 2}" y1="${Y(sorted[0])}" y2="${Y(sorted[0])}" stroke="${gr.color}" stroke-width="3"/>`;
+      }
+      g += shape;
+      const s = gr.stats;
+      g += `<line x1="${cx}" x2="${cx}" y1="${Y(s.q1)}" y2="${Y(s.q3)}" stroke="${ink}" stroke-width="4" stroke-linecap="round" pointer-events="none"/><circle cx="${cx}" cy="${Y(s.med)}" r="3" fill="${surf}" stroke="${ink}" stroke-width="1.25" pointer-events="none"/>`;
+    });
+    return `<svg class="violin" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Violin plot">${g}<rect x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="none" stroke="${axis}"/></svg>`;
+  }
+  function renderEnvStats(sel = select()) {
+    if (!ENV) return;
+    if (!ENV.length) { $("envNote").textContent = "Environment data aren't available yet."; $("violins").innerHTML = ""; return; }
+    const { recs, isTor, skipped } = envSample(sel);
+    const torC = css("--tor"), nonC = css("--nontor"), grayC = css("--muted");
+    const mode = $("envClass").value, subset = $("envSubset").value;
+    const nSc = new Set(recs.map((e) => M[e.m].sc)).size, nTor = recs.filter(isTor).length;
+    const unit = mode === "sc" ? "supercell" : "mesocyclone";
+    const what = subset === "all" ? "every hourly environment" : subset === "initial" ? `the first hourly environment of each ${unit}` : `the hourly environment nearest each ${unit}'s peak`;
+    $("envNote").textContent = `${nf(recs.length)} HRRR inflow environments (${nf(nTor)} tornadic, ${nf(recs.length - nTor)} nontornadic) from ${nSc} supercell${nSc === 1 ? "" : "s"} active in the window, using ${what}; tornadic = ${mode === "sc" ? "any mesocyclone in a tornadic supercell" : "the mesocyclone itself produced a tornado"}.${skipped ? ` ${skipped} ${unit}${skipped === 1 ? "" : "s"} without a peak time (no AzShear data or no timed tornado) left out.` : ""} SRH uses observed storm motion.`;
+    $("violins").innerHTML = VIOLIN_VARS.map(([col, label, u], vi) => {
+      const k = ENV_COLS.indexOf(col);
+      const pick = (f) => recs.map((e) => [e.v[k], e]).filter(([v, e]) => v != null && f(e));
+      const tor = pick(isTor), non = pick((e) => !isTor(e)), all = pick(() => true);
+      const groups = [
+        { name: "Tornadic", color: torC, vals: tor.map((x) => x[0]) },
+        { name: "All", color: grayC, vals: all.map((x) => x[0]) },
+        { name: "Nontornadic", color: nonC, vals: non.map((x) => x[0]) },
+      ];
+      const svg = violinSVG(groups, u);
+      const md = (gr) => (gr.stats.med == null ? "—" : nf(gr.stats.med, Math.abs(gr.stats.med) < 100 ? 1 : 0));
+      envStatsCache[vi] = { groups, label, u };
+      return `<div class="card violin-card" data-vi="${vi}"><h2>${label}</h2><p class="hint">${u} · median ${md(groups[0])} tornadic vs ${md(groups[2])} nontornadic</p>${svg}</div>`;
+    }).join("");
+  }
+  const envStatsCache = {};
+  $("violins").addEventListener("mousemove", (ev) => {
+    const v = ev.target.closest(".vio"), card = ev.target.closest(".violin-card");
+    if (!v || !card) { tipEl.style.opacity = 0; return; }
+    const { groups, u } = envStatsCache[+card.dataset.vi], gr = groups[+v.dataset.g], s = gr.stats;
+    const r1 = (x) => (x == null ? "—" : nf(x, Math.abs(x) < 100 ? 1 : 0));
+    tipEl.innerHTML = `<b>${gr.name}</b>n = ${s.n}<br>Median ${r1(s.med)} ${u}<br>IQR ${r1(s.q1)} – ${r1(s.q3)}<br>Mean ${r1(s.mean)}`;
+    tipEl.style.left = `${ev.pageX}px`; tipEl.style.top = `${ev.pageY - 6}px`; tipEl.style.opacity = 1;
+  });
+  $("violins").addEventListener("mouseleave", () => (tipEl.style.opacity = 0));
+
+  // tabs under the map
+  function setStatTab(env) {
+    $("tabGeneral").setAttribute("aria-selected", !env); $("tabEnv").setAttribute("aria-selected", env);
+    $("panelGeneral").hidden = env; $("panelEnv").hidden = !env; $("envControls").hidden = !env;
+    if (env) { $("envNote").textContent = ENV ? "" : "Loading environments…"; loadEnv().then(() => renderEnvStats()); }
+  }
+  $("tabGeneral").addEventListener("click", () => setStatTab(false));
+  $("tabEnv").addEventListener("click", () => setStatTab(true));
+  $("envSubset").addEventListener("change", () => {
+    document.querySelectorAll(".strongest-opt").forEach((el) => (el.hidden = $("envSubset").value !== "strongest"));
+    renderEnvStats();
+  });
+  ["envPeakNon", "envPeakTor", "envClass"].forEach((id) => $(id).addEventListener("change", () => renderEnvStats()));
+
   function select() {
     const [a, b] = win;
     const scs = S.filter((s) => s.t0 <= b && s.t1 >= a);
@@ -963,6 +1107,7 @@
   function render({ fit = false } = {}) {
     const sel = select();
     drawMap(sel);
+    if (!$("panelEnv").hidden) renderEnvStats(sel);
     if (fit) fitToSelection(sel);
 
     const scs = sel.scs;

@@ -103,80 +103,122 @@
     </aside>
   </section>
 
-  <section class="grid-charts">
-    <div class="card">
-      <h2>Mesocyclones per supercell</h2>
-      <p class="hint" id="mpcHint"></p>
-      <div class="chart-box"><canvas id="histMeso"></canvas></div>
+  <section class="stat-tabs">
+    <div class="stat-tabs-head">
+      <div class="tabs big-tabs" role="tablist" aria-label="Statistics">
+        <button role="tab" id="tabGeneral" aria-selected="true" aria-controls="panelGeneral">General stats</button>
+        <button role="tab" id="tabEnv" aria-selected="false" aria-controls="panelEnv">Environments</button>
+      </div>
+      <div class="env-controls" id="envControls" hidden>
+        <label>Times
+          <select id="envSubset">
+            <option value="all">All</option>
+            <option value="initial">Initial</option>
+            <option value="strongest">Strongest</option>
+          </select>
+        </label>
+        <label class="strongest-opt" hidden>Nontornadic peak
+          <select id="envPeakNon">
+            <option value="lo">Low-level AzShear</option>
+            <option value="mid">Mid-level AzShear</option>
+          </select>
+        </label>
+        <label class="strongest-opt" hidden>Tornadic peak
+          <select id="envPeakTor">
+            <option value="tor">Strongest tornado</option>
+            <option value="lo">Low-level AzShear</option>
+            <option value="mid">Mid-level AzShear</option>
+          </select>
+        </label>
+        <label>Tornadic by
+          <select id="envClass">
+            <option value="sc">Supercell</option>
+            <option value="meso">Mesocyclone</option>
+          </select>
+        </label>
+      </div>
     </div>
-    <div class="card">
-      <h2>Mesocyclone lifetime</h2>
-      <p class="hint" id="lifeHint"></p>
-      <div class="chart-box"><canvas id="histLife"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>Supercell dissipation mode</h2>
-      <p class="hint">Supercell count by how the storm ended</p>
-      <div class="chart-box"><canvas id="barEnd"></canvas></div>
-    </div>
-  </section>
+    <div class="stat-panel" id="panelGeneral" role="tabpanel" aria-labelledby="tabGeneral">
+    <section class="grid-charts">
+      <div class="card">
+        <h2>Mesocyclones per supercell</h2>
+        <p class="hint" id="mpcHint"></p>
+        <div class="chart-box"><canvas id="histMeso"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Mesocyclone lifetime</h2>
+        <p class="hint" id="lifeHint"></p>
+        <div class="chart-box"><canvas id="histLife"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Supercell dissipation mode</h2>
+        <p class="hint">Supercell count by how the storm ended</p>
+        <div class="chart-box"><canvas id="barEnd"></canvas></div>
+      </div>
+    </section>
 
-  <section class="grid-bottom">
-    <div class="card">
-      <h2>Tornado ratings</h2>
-      <p class="hint">Maximum segment rating along each track</p>
-      <div class="chart-box"><canvas id="barEF"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>Time from track start to first tornado</h2>
-      <p class="hint" id="ttHint"></p>
-      <div class="chart-box"><canvas id="histTT"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h2>Days</h2>
-          <p class="hint">Click a day to set the window and zoom the map</p>
+    <section class="grid-bottom">
+      <div class="card">
+        <h2>Tornado ratings</h2>
+        <p class="hint">Maximum segment rating along each track</p>
+        <div class="chart-box"><canvas id="barEF"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Time from track start to first tornado</h2>
+        <p class="hint" id="ttHint"></p>
+        <div class="chart-box"><canvas id="histTT"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Days</h2>
+            <p class="hint">Click a day to set the window and zoom the map</p>
+          </div>
+          <button id="allBtn2">All days</button>
         </div>
-        <button id="allBtn2">All days</button>
+        <div class="table-wrap">
+          <table class="days">
+            <thead><tr>
+              <th data-k="date">Date</th><th data-k="sc">Supercells</th><th data-k="tsc">Tornadic</th>
+              <th data-k="m">Mesos</th><th data-k="tor">Tornadoes</th><th data-k="maxef">Max EF</th>
+            </tr></thead>
+            <tbody id="dayRows"></tbody>
+          </table>
+        </div>
       </div>
-      <div class="table-wrap">
-        <table class="days">
-          <thead><tr>
-            <th data-k="date">Date</th><th data-k="sc">Supercells</th><th data-k="tsc">Tornadic</th>
-            <th data-k="m">Mesos</th><th data-k="tor">Tornadoes</th><th data-k="maxef">Max EF</th>
-          </tr></thead>
-          <tbody id="dayRows"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="grid-pair">
-    <div class="card">
-      <h2>Tornadoes per supercell</h2>
-      <p class="hint" id="tpsHint"></p>
-      <div class="chart-box"><canvas id="histTPS"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>Tornadoes per mesocyclone</h2>
-      <p class="hint" id="tpmHint"></p>
-      <div class="chart-box"><canvas id="histTPM"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <div>
-          <h2>Tornado chronology</h2>
-          <p class="hint" id="chronoHint"></p>
-        </div>
-        <div class="tabs" role="tablist" aria-label="Chronology view">
-          <button role="tab" id="tabIntensity" aria-selected="true">Intensity</button>
-          <button role="tab" id="tabOrder" aria-selected="false">Order</button>
-        </div>
+    <section class="grid-pair">
+      <div class="card">
+        <h2>Tornadoes per supercell</h2>
+        <p class="hint" id="tpsHint"></p>
+        <div class="chart-box"><canvas id="histTPS"></canvas></div>
       </div>
-      <div class="order-grid" id="orderGrid"></div>
-      <div class="order-grid by-order" id="orderGrid2" hidden></div>
-      <div class="order-legend" id="orderLegend"></div>
+      <div class="card">
+        <h2>Tornadoes per mesocyclone</h2>
+        <p class="hint" id="tpmHint"></p>
+        <div class="chart-box"><canvas id="histTPM"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Tornado chronology</h2>
+            <p class="hint" id="chronoHint"></p>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Chronology view">
+            <button role="tab" id="tabIntensity" aria-selected="true">Intensity</button>
+            <button role="tab" id="tabOrder" aria-selected="false">Order</button>
+          </div>
+        </div>
+        <div class="order-grid" id="orderGrid"></div>
+        <div class="order-grid by-order" id="orderGrid2" hidden></div>
+        <div class="order-legend" id="orderLegend"></div>
+      </div>
+    </section>
+    </div>
+    <div class="stat-panel" id="panelEnv" role="tabpanel" aria-labelledby="tabEnv" hidden>
+      <p class="env-note" id="envNote"></p>
+      <div class="grid-violins" id="violins"></div>
     </div>
   </section>
 

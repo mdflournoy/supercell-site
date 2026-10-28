@@ -142,6 +142,16 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   brings everything back. It
   disappears if the window moves off that day. This filters the map only.
 
+- Below the map, two tabs: **General stats** (the charts above) and **Environments**: violin plots of
+  MLCAPE, MLCIN, MLLCL, MLLFC, 0–500 m / 0–1 km / 0–3 km SRH (observed motion) and 0–500 m / 0–1 km / 0–6 km
+  bulk shear for the HRRR inflow environments of supercells active in the window — tornadic (red), all
+  (gray) and nontornadic (blue), each with its median (dot) and interquartile range (bar). Controls:
+  *Times* — All hourly environments, Initial (first hour of each storm) or Strongest (the hour nearest
+  each storm's peak low- or mid-level AzShear, or for tornadic storms optionally its strongest tornado's
+  start: highest EF, then longest path); *Tornadic by* — Supercell (every meso of a tornadic supercell
+  counts as tornadic; a "storm" is the supercell) or Mesocyclone (each meso by its own tornadoes; a
+  "storm" is the meso).
+
 Everything except the map shows **whole supercells active at any point in the window**.
 The map shows only the parts of each track inside the window.
 
