@@ -310,3 +310,17 @@ footer a { color: var(--ink-2); }
 .env-arrow:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
 .env-arrow:disabled { opacity: .2; cursor: default; }
 .env-inner .env-head { white-space: nowrap; }
+
+/* timeseries in pinned sounding windows */
+.ts-panel { margin: 6px 34px 0; }
+.ts-panel[hidden] { display: none; }
+.ts-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.ts-search { flex: 1; max-width: 250px; padding: 4px 8px; font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--ring); border-radius: 6px; }
+.ts-radios { display: flex; gap: 10px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.ts-radios label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.ts-svg { display: block; }
+.ts-dot { cursor: pointer; }
+.ts-msg { font-size: 11.5px; color: var(--tor); min-height: 0; }
+.ts-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 8px 0 -8px; padding: 5px 10px; border: 0; border-top: 1px solid var(--ring);
+  border-radius: 0 0 10px 10px; background: var(--surface-2); color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ts-toggle:hover { color: var(--ink); }

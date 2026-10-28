@@ -124,11 +124,15 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   `env-params/` — a 40 km, 90° wedge centered on the inflow direction at the meso's position at each top
   of the hour, outlined and lightly filled in its track's color. Hovering a slice shows its inflow
   sounding as a Skew-T (with the 100-hPa mixed-layer parcel path, a bold 0 °C isotherm and the effective
-  inflow layer as a cyan bracket labeled with ESRH) and a 0–10 km hodograph (0–0.5 km purple; observed
-  motion ○, Bunkers right-mover ×), with surface T/Td, MLCAPE/MLCIN, MLLCL, MLLFC and effective SRH.
+  inflow layer as a cyan bracket labeled with its base/top heights and ESRH) and a 0–10 km hodograph (0–0.5 km purple; observed
+  motion ○, Bunkers right-mover ×), with surface T/Td, MLCAPE/MLCIN, MLLCL/MLLFC and effective SRH.
   **Click** a slice to pin the sounding in a draggable window; its ‹ › arrows step hour by hour through
   that supercell's environments (hodograph axes stay fixed per supercell for comparison). Pin several
-  to compare side by side. The page loads these from `site/env.json`
+  to compare side by side. A pinned window's **Timeseries** tab expands a plot of any parameter over the
+  supercell's life (default MLCAPE; type a name in the search box, e.g. "0-1 km SRH" or "stp eff"), one
+  black line per meso with a dot each hour (the hour on display is the big dot; click a dot to jump there),
+  optionally overlaid with the 2-min low-level or mid-level MRMS AzShear (right axis). The page gets
+  every parameter in `env-params/` from `site/env.json`. The page loads these from `site/env.json`
   only when the box is first checked. A dot marks each slice's apex on its parent track; hovering a slice
   or dot also highlights the parent supercell.
 - **Meso IDs on the map** (e.g. `A1`, in the track's color, at the start of each track) whenever the

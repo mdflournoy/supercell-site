@@ -329,10 +329,11 @@
 
   // ---------------------------------------------------------------- HRRR inflow environments
   let ENV = null, envLoading = null, scShow = null; // scShow: Set of visible supercell indices, or null = all
+  let ENV_COLS = [];
   async function loadEnv() {
     if (ENV) return ENV;
     envLoading ||= fetch("env.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((e) => (ENV = e)).catch((err) => { console.warn("env.json:", err); ENV = []; return ENV; });
+      .then((d) => { ENV_COLS = d.cols || []; ENV = d.recs || d; return ENV; }).catch((err) => { console.warn("env.json:", err); ENV = []; return ENV; });
     return envLoading;
   }
   const ENV_R = 40, ENV_HALF = 45; // km, degrees (matches scripts/hrrr_env.py)
@@ -406,8 +407,7 @@
       <table class="env-params">
         <tr><td>T / T<sub>d</sub></td><td>${f1(e.T)} / ${f1(e.Td)} °C</td></tr>
         <tr><td>MLCAPE / MLCIN</td><td>${f0(e.mlcape)} / ${f0(e.mlcin)} J kg⁻¹</td></tr>
-        <tr><td>MLLCL</td><td>${f0(e.mllcl)} m AGL</td></tr>
-        <tr><td>MLLFC</td><td>${f0(e.mllfc)} m AGL</td></tr>
+        <tr><td>MLLCL / MLLFC</td><td>${f0(e.mllcl)} / ${f0(e.mllfc)} m AGL</td></tr>
         <tr><td>ESRH</td><td>${f0(e.esrh)} m² s⁻² <span class="dim">(obs. motion)</span> · ${f0(e.esrh_b)} <span class="dim">(Bunkers RM)</span></td></tr>
       </table>`;
   }
@@ -415,6 +415,111 @@
     envTip.innerHTML = `<div class="env-pin-hint"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 17v5M9 3h6l-1 7 4 4H6l4-4z"/></svg>Click to pin this sounding, then step through the storm's hours</div><div class="env-inner">${envBody(e)}</div>`;
     envTip.style.visibility = "visible"; envTip.style.opacity = 1;
     placeEnvTip(oe);
+  }
+
+  // ---- timeseries of one parameter over a supercell's life (pinned windows) ----
+  const PARAM_INFO = {
+    obs_spd: ["Observed storm speed", "m s⁻¹"], obs_dir: ["Observed storm direction", "°"],
+    sbcape: ["SBCAPE", "J kg⁻¹"], sbcin: ["SBCIN", "J kg⁻¹"], sblcl: ["SBLCL", "m AGL"], sblfc: ["SBLFC", "m AGL"], sbel: ["SBEL", "m AGL"],
+    mlcape: ["MLCAPE", "J kg⁻¹"], mlcin: ["MLCIN", "J kg⁻¹"], mllcl: ["MLLCL", "m AGL"], mllfc: ["MLLFC", "m AGL"], mlel: ["MLEL", "m AGL"],
+    mucape: ["MUCAPE", "J kg⁻¹"], mucin: ["MUCIN", "J kg⁻¹"], mulpl: ["MU parcel level", "m AGL"], mulfc: ["MULFC", "m AGL"], muel: ["MUEL", "m AGL"],
+    mlcape03: ["0–3 km MLCAPE", "J kg⁻¹"], ecape: ["ECAPE", "J kg⁻¹"], eff_base: ["Effective inflow base", "m AGL"], eff_top: ["Effective inflow top", "m AGL"],
+    eff_depth: ["Effective inflow depth", "m"], dcape: ["DCAPE", "J kg⁻¹"], lr03: ["0–3 km lapse rate", "°C km⁻¹"], lr36: ["3–6 km lapse rate", "°C km⁻¹"],
+    lr75: ["700–500 hPa lapse rate", "°C km⁻¹"], t_sfc: ["Surface T", "°C"], td_sfc: ["Surface Td", "°C"], mlmr: ["ML mixing ratio", "g kg⁻¹"],
+    pw: ["Precipitable water", "mm"], rh01: ["0–1 km RH", "%"], rh13: ["1–3 km RH", "%"], rh36: ["3–6 km RH", "%"], frz_lvl: ["Freezing level", "m AGL"],
+    grw500: ["500 m wind speed", "m s⁻¹"], grw1: ["1 km wind speed", "m s⁻¹"], grw6: ["6 km wind speed", "m s⁻¹"], grw05_3: ["0.5–3 km mean wind speed", "m s⁻¹"],
+    bwd500: ["0–500 m bulk shear", "m s⁻¹"], bwd1: ["0–1 km bulk shear", "m s⁻¹"], bwd3: ["0–3 km bulk shear", "m s⁻¹"], bwd6: ["0–6 km bulk shear", "m s⁻¹"],
+    bwd13: ["1–3 km bulk shear", "m s⁻¹"], ebwd: ["Effective bulk shear", "m s⁻¹"],
+    srh500: ["0–500 m SRH", "m² s⁻²"], srh1: ["0–1 km SRH", "m² s⁻²"], srh3: ["0–3 km SRH", "m² s⁻²"], srh13: ["1–3 km SRH", "m² s⁻²"], esrh: ["ESRH", "m² s⁻²"],
+    srf500: ["500 m storm-relative wind", "m s⁻¹"], srf1: ["1 km storm-relative wind", "m s⁻¹"], srf3: ["3 km storm-relative wind", "m s⁻¹"],
+    srf13: ["1–3 km mean storm-relative wind", "m s⁻¹"], srf01: ["0–1 km mean storm-relative wind", "m s⁻¹"],
+    sw500: ["0–500 m streamwise vorticity", "s⁻¹"], cw500: ["0–500 m crosswise vorticity", "s⁻¹"], psw500: ["0–500 m % streamwise vorticity", "%"],
+    crit_angle: ["Critical angle", "°"], stp_fixed: ["STP (fixed layer)", ""], stp_eff: ["STP (effective layer)", ""], stp500: ["STP (500 m)", ""], scp: ["SCP", ""],
+  };
+  function paramInfo(col) {
+    const m = col.match(/^(.*)_(obs|bunk)$/);
+    const [lab, unit] = PARAM_INFO[m ? m[1] : col] || [col, ""];
+    return { col, label: m ? `${lab} (${m[2] === "obs" ? "obs. motion" : "Bunkers RM"})` : lab, unit };
+  }
+  let varList = null;
+  function ensureVarList() {
+    if (varList) return varList;
+    varList = ENV_COLS.map(paramInfo);
+    const dl = document.createElement("datalist");
+    dl.id = "envVarList";
+    dl.innerHTML = varList.map((v) => `<option value="${v.label}">${v.col}</option>`).join("");
+    document.body.appendChild(dl);
+    return varList;
+  }
+  const norm = (x) => x.toLowerCase().replace(/[–—]/g, "-").replace(/[()]/g, " ").replace(/\s+/g, " ").trim();
+  function findVar(q) {
+    q = norm(q || "");
+    if (!q) return null;
+    const L_ = ensureVarList(), toks = q.split(" ");
+    const lab = (v) => norm(v.label);
+    return L_.find((v) => lab(v) === q || v.col === q)
+      || L_.find((v) => lab(v).startsWith(q) || v.col.startsWith(q))
+      || L_.find((v) => toks.every((t) => lab(v).includes(t)))
+      || L_.find((v) => v.col.includes(q.replace(/ /g, "_")));
+  }
+  const niceStep = (span, n) => { const r = span / n, p = Math.pow(10, Math.floor(Math.log10(r))), f = r / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; };
+  const fmtNum = (v, step) => { const d = Math.max(0, -Math.floor(Math.log10(step) + 1e-9)); return Math.abs(v) >= 1e4 ? v.toFixed(0) : v.toFixed(Math.min(d, 4)); };
+  function tsChart(si, list, cur, col, az) {
+    const W = 510, H = 168, ml = 46, mr = az ? 40 : 12, mt = 16, mb = 22, pw = W - ml - mr, ph = H - mt - mb;
+    const ink = css("--ink"), grid = css("--grid"), muted = css("--muted"), axis = css("--axis"), surf = css("--surface"), AZC = "#e8711a";
+    const k = ENV_COLS.indexOf(col), info = paramInfo(col);
+    const mesos = S[si].mesos;
+    const azIdx = az === "ml" ? AZ_LEVELS.mid.idx : AZ_LEVELS.lo.idx;
+    // time axis: whole supercell life plus any "hour before" environment
+    let t0 = Math.min(S[si].t0, ...list.map((x) => x.t)), t1 = Math.max(S[si].t1, ...list.map((x) => x.t));
+    if (t1 - t0 < 3600) { t0 -= 1800; t1 += 1800; }
+    const X = (t) => ml + (t - t0) / (t1 - t0) * pw;
+    const vals = list.map((x) => x.v[k]).filter((v) => v != null);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (!vals.length) { lo = 0; hi = 1; }
+    if (hi - lo < 1e-9) { const d = Math.abs(hi) * 0.1 || 1; lo -= d; hi += d; }
+    const st = niceStep(hi - lo, 4); lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st) * st;
+    const Y = (v) => mt + ph - (v - lo) / (hi - lo) * ph;
+    let g = "";
+    for (let v = lo; v <= hi + st / 2; v += st) g += `<line x1="${ml}" x2="${ml + pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="${grid}" stroke-width="0.8"/><text x="${ml - 5}" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="${muted}">${fmtNum(v, st)}</text>`;
+    const hrs = (t1 - t0) / 3600, every = hrs > 10 ? 3 : hrs > 5 ? 2 : 1;
+    for (let t = Math.ceil(t0 / 3600) * 3600; t <= t1; t += 3600) {
+      const h = new Date(t * 1000).getUTCHours();
+      if (h % every) continue;
+      g += `<line x1="${X(t)}" x2="${X(t)}" y1="${mt + ph}" y2="${mt + ph + 4}" stroke="${axis}"/><text x="${X(t)}" y="${mt + ph + 14}" text-anchor="middle" font-size="9" fill="${muted}">${pad(h)}Z</text>`;
+    }
+    // AzShear (right axis), one line per meso, 2-min MRMS series
+    if (az) {
+      const amax = Math.max(AZ_MAX, ...mesos.flatMap((mi) => (M[mi].az || []).map((p) => p[azIdx] ?? 0)));
+      const st2 = niceStep(amax, 3), top = Math.ceil(amax / st2) * st2, YA = (v) => mt + ph - v / top * ph;
+      for (let v = 0; v <= top + st2 / 2; v += st2) g += `<text x="${ml + pw + 5}" y="${YA(v) + 3}" font-size="9" fill="${AZC}">${fmtNum(v, st2)}</text>`;
+      for (const mi of mesos) {
+        let d = "", pen = false;
+        for (const p of M[mi].az || []) {
+          if (p[azIdx] == null) { pen = false; continue; }
+          d += `${pen ? "L" : "M"}${X(p[0]).toFixed(1)},${YA(p[azIdx]).toFixed(1)}`; pen = true;
+        }
+        if (d) g += `<path d="${d}" fill="none" stroke="${AZC}" stroke-width="1.4" stroke-opacity="0.9" stroke-linejoin="round"/>`;
+      }
+      g += `<text x="${ml + pw}" y="${mt - 5}" text-anchor="end" font-size="9.5" font-weight="600" fill="${AZC}">${az === "ml" ? "Mid-level (3–6 km)" : "Low-level (0–2 km)"} AzShear (10⁻³ s⁻¹)</text>`;
+    }
+    // the parameter: black line per meso, dots each hour, current hour's dot twice as big
+    const byMeso = {};
+    list.forEach((x, j) => (byMeso[x.m] ||= []).push(j));
+    let dots = "";
+    for (const [mi, js] of Object.entries(byMeso)) {
+      const pts = js.filter((j) => list[j].v[k] != null);
+      if (pts.length > 1) g += `<path d="${pts.map((j, n) => `${n ? "L" : "M"}${X(list[j].t).toFixed(1)},${Y(list[j].v[k]).toFixed(1)}`).join("")}" fill="none" stroke="${ink}" stroke-width="1.75" stroke-linejoin="round"/>`;
+      if (mesos.length > 1 && pts.length) { const j = pts[pts.length - 1]; g += `<text x="${X(list[j].t) + 7}" y="${Y(list[j].v[k]) - 6}" font-size="8.5" fill="${muted}">${M[mi].label}</text>`; }
+      for (const j of pts) {
+        const big = j === cur, x = list[j];
+        dots += `<circle class="ts-dot" data-j="${j}" cx="${X(x.t).toFixed(1)}" cy="${Y(x.v[k]).toFixed(1)}" r="${big ? 7 : 3.5}" fill="${ink}" stroke="${surf}" stroke-width="${big ? 2 : 1.5}"><title>${M[x.m].label} · ${fmtHM(x.t)} · ${fmtNum(x.v[k], st / 100)} ${info.unit}</title></circle>`;
+      }
+    }
+    if (!vals.length) g += `<text x="${ml + pw / 2}" y="${mt + ph / 2}" text-anchor="middle" font-size="11" fill="${muted}">No values for this storm</text>`;
+    return `<svg class="ts-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${info.label} timeseries">
+      <text x="${ml}" y="${mt - 5}" font-size="9.5" font-weight="600" fill="${ink}">${info.label}${info.unit ? ` (${info.unit})` : ""}</text>
+      ${g}<rect x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="none" stroke="${axis}"/>${dots}</svg>`;
   }
 
   // Pinned windows: drag bar on top, ‹ › to step hour by hour through the same supercell.
@@ -426,15 +531,50 @@
     win.className = "env-tip env-pinned";
     win.style.zIndex = ++pinZ;
     win.innerHTML = `<div class="env-bar" title="Drag to move"><span class="grip" aria-hidden="true">⋮⋮</span><span class="env-bar-title"></span><button class="env-close" aria-label="Close">×</button></div>
-      <div class="env-step"><button class="env-arrow prev" aria-label="Previous hour">‹</button><div class="env-inner"></div><button class="env-arrow next" aria-label="Next hour">›</button></div>`;
+      <div class="env-step"><button class="env-arrow prev" aria-label="Previous hour">‹</button><div class="env-inner"></div><button class="env-arrow next" aria-label="Next hour">›</button></div>
+      <div class="ts-panel" hidden>
+        <div class="ts-head"><input class="ts-search" type="search" list="envVarList" placeholder="Search a parameter (e.g. 0–1 km SRH)" aria-label="Parameter to plot" spellcheck="false">
+          <div class="ts-radios" role="radiogroup" aria-label="AzShear overlay">
+            <label><input type="radio" name="az${pinZ}" value="" checked> None</label>
+            <label><input type="radio" name="az${pinZ}" value="ml"> ML AzShear</label>
+            <label><input type="radio" name="az${pinZ}" value="lo"> LL AzShear</label></div></div>
+        <div class="ts-chart"></div><div class="ts-msg"></div>
+      </div>
+      <button class="ts-toggle" type="button" aria-expanded="false"><span class="ts-arrow">▾</span> Timeseries</button>`;
     document.body.appendChild(win);
+    ensureVarList();
+    let tsVar = "mlcape", tsAz = "";
+    const tsPanel = win.querySelector(".ts-panel"), tsSearch = win.querySelector(".ts-search");
+    const drawTs = () => { if (!tsPanel.hidden) win.querySelector(".ts-chart").innerHTML = tsChart(si, list, i, tsVar, tsAz); };
     const show = () => {
       win.querySelector(".env-inner").innerHTML = envBody(list[i]);
       win.querySelector(".env-bar-title").textContent = `Supercell ${S[si].label} · hour ${i + 1} of ${list.length}`;
       win.querySelector(".prev").disabled = i === 0;
       win.querySelector(".next").disabled = i === list.length - 1;
+      drawTs();
     };
     show();
+    tsSearch.value = paramInfo(tsVar).label;
+    win.querySelector(".ts-toggle").addEventListener("click", (ev) => {
+      const open = tsPanel.hidden;
+      tsPanel.hidden = !open;
+      ev.currentTarget.setAttribute("aria-expanded", open);
+      ev.currentTarget.innerHTML = open ? '<span class="ts-arrow">▴</span> Hide timeseries' : '<span class="ts-arrow">▾</span> Timeseries';
+      drawTs();
+    });
+    const pick = () => {
+      const v = findVar(tsSearch.value);
+      win.querySelector(".ts-msg").textContent = v ? "" : `No parameter matches “${tsSearch.value}”.`;
+      if (v) { tsVar = v.col; tsSearch.value = v.label; drawTs(); }
+    };
+    tsSearch.addEventListener("change", pick);
+    tsSearch.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); pick(); tsSearch.blur(); } });
+    tsSearch.addEventListener("focus", () => tsSearch.select());
+    win.querySelectorAll(".ts-radios input").forEach((r) => r.addEventListener("change", () => { tsAz = r.value; drawTs(); }));
+    win.querySelector(".ts-chart").addEventListener("click", (ev) => {
+      const d = ev.target.closest(".ts-dot");
+      if (d) { i = +d.dataset.j; show(); }
+    });
     win.querySelector(".prev").addEventListener("click", () => { if (i > 0) { i--; show(); } });
     win.querySelector(".next").addEventListener("click", () => { if (i < list.length - 1) { i++; show(); } });
     win.querySelector(".env-close").addEventListener("click", () => win.remove());
@@ -533,7 +673,8 @@
     if (pb && pt) {
       const x = 14, y0 = Y(pb), y1 = Math.min(Y(pt), y0 - 2);
       eff = `<g stroke="#17becf" stroke-width="2" stroke-linecap="round"><line x1="${x}" x2="${x}" y1="${y0}" y2="${y1}"/><line x1="${x - 5}" x2="${x + 5}" y1="${y0}" y2="${y0}"/><line x1="${x - 5}" x2="${x + 5}" y1="${y1}" y2="${y1}"/></g>
-        <text x="${x + 7}" y="${(y0 + y1) / 2 + 3}" font-size="9" font-weight="600" fill="#17becf">${f0(e.esrh)}</text>`;
+        <g font-size="8" fill="#17becf"><text x="${x + 8}" y="${y0 + 3}">${f0(e.eb)} m</text><text x="${x + 8}" y="${Math.min(y1 + 3, y0 - 6)}">${f0(e.et)} m</text></g>
+        <text x="${x + 44}" y="${(y0 + Math.min(y1 + 3, y0 - 6)) / 2 + 3}" font-size="9" font-weight="600" fill="#17becf">${f0(e.esrh)} m² s⁻²</text>`;
     }
     return `<svg class="skewt" viewBox="-28 -4 ${W + 32} ${H + 32}" width="${W + 32}" height="${H + 32}" role="img" aria-label="Skew-T">
       <defs><clipPath id="${id}"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath></defs>

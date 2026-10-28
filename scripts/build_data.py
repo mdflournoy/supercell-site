@@ -166,6 +166,14 @@ def main() -> None:
                 n_az += 1
         print(f"AzShear series attached to {n_az} of {len(mesos)} mesocyclones")
 
+    # every numeric parameter, for the sounding window's timeseries (names as in env-params/*.csv)
+    ENV_COLS = ["obs_spd", "obs_dir", "sbcape", "sbcin", "sblcl", "sblfc", "sbel", "mlcape", "mlcin", "mllcl", "mllfc", "mlel",
+                "mucape", "mucin", "mulpl", "mulfc", "muel", "mlcape03", "ecape_obs", "ecape_bunk", "eff_base", "eff_top",
+                "eff_depth", "dcape", "lr03", "lr36", "lr75", "t_sfc", "td_sfc", "mlmr", "pw", "rh01", "rh13", "rh36", "frz_lvl",
+                "grw500", "grw1", "grw6", "grw05_3", "bwd500", "bwd1", "bwd3", "bwd6", "bwd13", "ebwd"] + [
+        f"{n}_{t}" for n in ["srh500", "srh1", "srh3", "srh13", "esrh", "srf500", "srf1", "srf3", "srf13", "srf01",
+                             "sw500", "cw500", "psw500", "crit_angle", "stp_fixed", "stp_eff", "stp500", "scp"]
+        for t in ("obs", "bunk")]
     # HRRR inflow environments -> site/env.json (loaded by the page only when "Environments" is on)
     if a.env_params and Path(a.env_params).is_dir():
         lookup = {}
@@ -178,6 +186,11 @@ def main() -> None:
             except (TypeError, ValueError):
                 return None
             return None if v != v else round(v, nd)
+        def sig(v, n=4):  # n significant figures
+            v = fnum(v, 12)
+            if v is None or v == 0:
+                return v
+            return round(v, max(0, n - 1 - int(math.floor(math.log10(abs(v))))))
         env = []
         for f in sorted(Path(a.env_params).glob("*.csv")):
             event = f.stem
@@ -212,9 +225,10 @@ def main() -> None:
                     "obs": [fnum(r.get("obs_u")), fnum(r.get("obs_v"))],
                     "rm": [fnum(r.get("bunk_rm_u")), fnum(r.get("bunk_rm_v"))],
                     "prof": prof,
+                    "v": [sig(r.get(c)) for c in ENV_COLS],
                 })
         env_out = Path(a.out).with_name("env.json")
-        env_out.write_text(json.dumps(env, separators=(",", ":")).replace("NaN", "null"))
+        env_out.write_text(json.dumps({"cols": ENV_COLS, "recs": env}, separators=(",", ":")).replace("NaN", "null"))
         print(f"HRRR environments: {len(env)} meso-hours -> {env_out} ({env_out.stat().st_size/1e6:.1f} MB)")
 
     for s in supercells:
