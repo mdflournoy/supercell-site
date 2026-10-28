@@ -533,11 +533,7 @@
     win.innerHTML = `<div class="env-bar" title="Drag to move"><span class="grip" aria-hidden="true">⋮⋮</span><span class="env-bar-title"></span><button class="env-close" aria-label="Close">×</button></div>
       <div class="env-step"><button class="env-arrow prev" aria-label="Previous hour">‹</button><div class="env-inner"></div><button class="env-arrow next" aria-label="Next hour">›</button></div>
       <div class="ts-panel" hidden>
-        <div class="ts-head"><input class="ts-search" type="search" list="envVarList" placeholder="Search a parameter (e.g. 0–1 km SRH)" aria-label="Parameter to plot" spellcheck="false">
-          <div class="ts-radios" role="radiogroup" aria-label="AzShear overlay">
-            <label><input type="radio" name="az${pinZ}" value="" checked> None</label>
-            <label><input type="radio" name="az${pinZ}" value="ml"> ML AzShear</label>
-            <label><input type="radio" name="az${pinZ}" value="lo"> LL AzShear</label></div></div>
+        <div class="ts-head"><input class="ts-search" type="search" list="envVarList" placeholder="Search a parameter (e.g. 0–1 km SRH)" aria-label="Parameter to plot" spellcheck="false"></div>
         <div class="ts-chart"></div><div class="ts-msg"></div>
       </div>
       <button class="ts-toggle" type="button" aria-expanded="false"><span class="ts-arrow">▾</span> Timeseries</button>`;
@@ -570,7 +566,6 @@
     tsSearch.addEventListener("change", pick);
     tsSearch.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); pick(); tsSearch.blur(); } });
     tsSearch.addEventListener("focus", () => tsSearch.select());
-    win.querySelectorAll(".ts-radios input").forEach((r) => r.addEventListener("change", () => { tsAz = r.value; drawTs(); }));
     win.querySelector(".ts-chart").addEventListener("click", (ev) => {
       const d = ev.target.closest(".ts-dot");
       if (d) { i = +d.dataset.j; show(); }
