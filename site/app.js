@@ -1059,6 +1059,12 @@
     });
     return `<svg class="violin" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Violin plot">${g}<rect x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="none" stroke="${axis}"/></svg>`;
   }
+  // tornadic median relative to nontornadic: (tor - non) / |non|
+  function pctDiff(tor, non, color) {
+    if (tor == null || non == null || non === 0) return "";
+    const p = Math.round((tor - non) / Math.abs(non) * 100);
+    return ` <span style="color:${color}">(${p > 0 ? "+" : p < 0 ? "−" : "±"}${Math.abs(p)}%)</span>`;
+  }
   function renderEnvStats(sel = select()) {
     if (!ENV) return;
     if (!ENV.length) { $("envNote").textContent = "Environment data aren't available yet."; $("violins").innerHTML = ""; return; }
@@ -1081,7 +1087,7 @@
       const svg = violinSVG(groups, u);
       const md = (gr) => (gr.stats.med == null ? "—" : nf(gr.stats.med, Math.abs(gr.stats.med) < 100 ? 1 : 0));
       envStatsCache[vi] = { groups, label, u };
-      return `<div class="card violin-card" data-vi="${vi}"><h2>${label} <span class="unit">(${u})</span></h2><p class="hint">Medians: <span style="color:${torC};font-weight:600">${md(groups[0])}</span> vs. <span style="color:${nonC};font-weight:600">${md(groups[2])}</span></p>${svg}</div>`;
+      return `<div class="card violin-card" data-vi="${vi}"><h2>${label} <span class="unit">(${u})</span></h2><p class="hint">Medians: <span style="color:${torC};font-weight:600">${md(groups[0])}</span> vs. <span style="color:${nonC};font-weight:600">${md(groups[2])}</span>${pctDiff(groups[0].stats.med, groups[2].stats.med, torC)}</p>${svg}</div>`;
     }).join("");
   }
   const envStatsCache = {};
