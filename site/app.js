@@ -424,7 +424,7 @@
     mlcape: ["MLCAPE", "J kg⁻¹"], mlcin: ["MLCIN", "J kg⁻¹"], mllcl: ["MLLCL", "m AGL"], mllfc: ["MLLFC", "m AGL"], mlel: ["MLEL", "m AGL"],
     mucape: ["MUCAPE", "J kg⁻¹"], mucin: ["MUCIN", "J kg⁻¹"], mulpl: ["MU parcel level", "m AGL"], mulfc: ["MULFC", "m AGL"], muel: ["MUEL", "m AGL"],
     mlcape03: ["0–3 km MLCAPE", "J kg⁻¹"], ecape: ["ECAPE", "J kg⁻¹"], eff_base: ["Effective inflow base", "m AGL"], eff_top: ["Effective inflow top", "m AGL"],
-    eff_depth: ["Effective inflow depth", "m"], dcape: ["DCAPE", "J kg⁻¹"], lr03: ["0–3 km lapse rate", "°C km⁻¹"], lr36: ["3–6 km lapse rate", "°C km⁻¹"],
+    eff_depth: ["Effective inflow depth", "m"], dcape: ["DCAPE", "J kg⁻¹"], lr03: ["Sfc–3 km lapse rate", "°C km⁻¹"], lr36: ["3–6 km lapse rate", "°C km⁻¹"],
     lr75: ["700–500 hPa lapse rate", "°C km⁻¹"], t_sfc: ["Surface T", "°C"], td_sfc: ["Surface Td", "°C"], mlmr: ["ML mixing ratio", "g kg⁻¹"],
     pw: ["Precipitable water", "mm"], rh01: ["0–1 km RH", "%"], rh13: ["1–3 km RH", "%"], rh36: ["3–6 km RH", "%"], frz_lvl: ["Freezing level", "m AGL"],
     grw500: ["500 m wind speed", "m s⁻¹"], grw1: ["1 km wind speed", "m s⁻¹"], grw6: ["6 km wind speed", "m s⁻¹"], grw05_3: ["0.5–3 km mean wind speed", "m s⁻¹"],
@@ -434,8 +434,11 @@
     srf500: ["500 m storm-relative wind", "m s⁻¹"], srf1: ["1 km storm-relative wind", "m s⁻¹"], srf3: ["3 km storm-relative wind", "m s⁻¹"],
     srf13: ["1–3 km mean storm-relative wind", "m s⁻¹"], srf01: ["0–1 km mean storm-relative wind", "m s⁻¹"],
     sw500: ["0–500 m streamwise vorticity", "s⁻¹"], cw500: ["0–500 m crosswise vorticity", "s⁻¹"], psw500: ["0–500 m % streamwise vorticity", "%"],
-    mws100: ["0–100 m mean wind speed", "m s⁻¹"], mws250: ["0–250 m mean wind speed", "m s⁻¹"], mws500: ["0–500 m mean wind speed", "m s⁻¹"],
-    mws1: ["0–1 km mean wind speed", "m s⁻¹"], mws3: ["0–3 km mean wind speed", "m s⁻¹"],
+    mws100: ["0–100 m mean ground-relative wind", "m s⁻¹"], mws250: ["0–250 m mean ground-relative wind", "m s⁻¹"], mws500: ["0–500 m mean ground-relative wind", "m s⁻¹"],
+    mws1: ["0–1 km mean ground-relative wind", "m s⁻¹"], mws3: ["0–3 km mean ground-relative wind", "m s⁻¹"],
+    srw100: ["0–100 m mean storm-relative wind (obs. motion)", "m s⁻¹"], srw250: ["0–250 m mean storm-relative wind (obs. motion)", "m s⁻¹"],
+    srw500: ["0–500 m mean storm-relative wind (obs. motion)", "m s⁻¹"], srw1: ["0–1 km mean storm-relative wind (obs. motion)", "m s⁻¹"],
+    srw3: ["0–3 km mean storm-relative wind (obs. motion)", "m s⁻¹"], lr85: ["850–500 hPa lapse rate", "°C km⁻¹"],
     crit_angle: ["Critical angle", "°"], stp_fixed: ["STP (fixed layer)", ""], stp_eff: ["STP (effective layer)", ""], stp500: ["STP (500 m)", ""], scp: ["SCP", ""],
   };
   function paramInfo(col) {
@@ -959,8 +962,14 @@
     ["mlcape", "MLCAPE", "J kg⁻¹"], ["mlcin", "MLCIN", "J kg⁻¹"], ["mllcl", "MLLCL", "m AGL"], ["mllfc", "MLLFC", "m AGL"],
     ["srh500_obs", "0–500 m SRH", "m² s⁻²"], ["srh1_obs", "0–1 km SRH", "m² s⁻²"], ["srh3_obs", "0–3 km SRH", "m² s⁻²"],
     ["bwd500", "0–500 m bulk shear", "m s⁻¹"], ["bwd1", "0–1 km bulk shear", "m s⁻¹"], ["bwd6", "0–6 km bulk shear", "m s⁻¹"],
-    ["mws100", "0–100 m mean wind", "m s⁻¹"], ["mws250", "0–250 m mean wind", "m s⁻¹"], ["mws500", "0–500 m mean wind", "m s⁻¹"],
-    ["mws1", "0–1 km mean wind", "m s⁻¹"], ["mws3", "0–3 km mean wind", "m s⁻¹"],
+    ["mws100", "0–100 m mean ground-relative wind", "m s⁻¹"], ["mws250", "0–250 m mean ground-relative wind", "m s⁻¹"],
+    ["mws500", "0–500 m mean ground-relative wind", "m s⁻¹"], ["mws1", "0–1 km mean ground-relative wind", "m s⁻¹"],
+    ["mws3", "0–3 km mean ground-relative wind", "m s⁻¹"],
+    ["srw100", "0–100 m mean storm-relative wind", "m s⁻¹"], ["srw250", "0–250 m mean storm-relative wind", "m s⁻¹"],
+    ["srw500", "0–500 m mean storm-relative wind", "m s⁻¹"], ["srw1", "0–1 km mean storm-relative wind", "m s⁻¹"],
+    ["srw3", "0–3 km mean storm-relative wind", "m s⁻¹"],
+    ["lr03", "Sfc–3 km lapse rate", "°C km⁻¹"], ["lr36", "3–6 km lapse rate", "°C km⁻¹"],
+    ["lr85", "850–500 hPa lapse rate", "°C km⁻¹"], ["lr75", "700–500 hPa lapse rate", "°C km⁻¹"],
   ];
   function envSample(sel) {
     const mode = $("envClass").value, subset = $("envSubset").value;

@@ -63,19 +63,36 @@ def parse_file(path: Path) -> tuple[pd.DataFrame, list[tuple[str, str]], str]:
 MWS_LAYERS = {"mws100": 100, "mws250": 250, "mws500": 500, "mws1": 1000, "mws3": 3000}
 
 
-def layer_mean_speeds(pr):
+# same layers, storm-relative (observed storm motion)
+SRW_LAYERS = {"srw100": 100, "srw250": 250, "srw500": 500, "srw1": 1000, "srw3": 3000}
+DERIVED_COLS = list(MWS_LAYERS) + list(SRW_LAYERS) + ["lr85"]
+
+
+def derived_params(pr, obs_u, obs_v):
+    """Layer-mean ground- and storm-relative wind speeds, and the 850-500 hPa lapse rate, from a profile."""
     import numpy as np
     z = pr["height_agl_m"].to_numpy(float)
     u, v = pr["u_ms"].to_numpy(float), pr["v_ms"].to_numpy(float)
+    p, t = pr["pressure_hpa"].to_numpy(float), pr["temperature_c"].to_numpy(float)
     ok = np.isfinite(z) & np.isfinite(u) & np.isfinite(v)
-    z, u, v = z[ok], u[ok], v[ok]
+    zw, uw, vw = z[ok], u[ok], v[ok]
     out = {}
-    for name, top in MWS_LAYERS.items():
-        if len(z) < 2 or z[0] >= top or z[-1] < top:
-            out[name] = None
-            continue
-        zz = np.arange(z[0], top + 1e-6, 5.0)
-        out[name] = float(np.mean(np.hypot(np.interp(zz, z, u), np.interp(zz, z, v))))
+    for layers, cu, cv in ((MWS_LAYERS, 0.0, 0.0), (SRW_LAYERS, obs_u, obs_v)):
+        for name, top in layers.items():
+            if cu is None or cv is None or len(zw) < 2 or zw[0] >= top or zw[-1] < top:
+                out[name] = None
+                continue
+            zz = np.arange(zw[0], top + 1e-6, 5.0)
+            out[name] = float(np.mean(np.hypot(np.interp(zz, zw, uw) - cu, np.interp(zz, zw, vw) - cv)))
+    # 850-500 hPa lapse rate (C/km); missing if 850 hPa is below the lowest level
+    okt = np.isfinite(p) & np.isfinite(t) & np.isfinite(z)
+    lp, tt, zt = np.log(p[okt])[::-1], t[okt][::-1], z[okt][::-1]   # ascending ln p
+    if len(lp) > 1 and lp[0] <= math.log(500) and lp[-1] >= math.log(850):
+        t8, t5 = np.interp(math.log(850), lp, tt), np.interp(math.log(500), lp, tt)
+        z8, z5 = np.interp(math.log(850), lp, zt), np.interp(math.log(500), lp, zt)
+        out["lr85"] = float((t8 - t5) / ((z5 - z8) / 1000))
+    else:
+        out["lr85"] = None
     return out
 
 
@@ -193,7 +210,7 @@ def main() -> None:
                 "grw500", "grw1", "grw6", "grw05_3", "bwd500", "bwd1", "bwd3", "bwd6", "bwd13", "ebwd"] + [
         f"{n}_{t}" for n in ["srh500", "srh1", "srh3", "srh13", "esrh", "srf500", "srf1", "srf3", "srf13", "srf01",
                              "sw500", "cw500", "psw500", "crit_angle", "stp_fixed", "stp_eff", "stp500", "scp"]
-        for t in ("obs", "bunk")] + list(MWS_LAYERS)
+        for t in ("obs", "bunk")] + DERIVED_COLS
     # HRRR inflow environments -> site/env.json (loaded by the page only when "Environments" is on)
     if a.env_params and Path(a.env_params).is_dir():
         lookup = {}
@@ -233,7 +250,7 @@ def main() -> None:
                         pr = pd.read_csv(pf, skiprows=1)
                         prof = [[fnum(x.height_agl_m, 0), fnum(x.pressure_hpa, 1), fnum(x.temperature_c, 1),
                                  fnum(x.dewpoint_c, 1), fnum(x.u_ms, 1), fnum(x.v_ms, 1)] for x in pr.itertuples()]
-                        derived = layer_mean_speeds(pr)
+                        derived = derived_params(pr, fnum(r.get("obs_u"), 3), fnum(r.get("obs_v"), 3))
                     except Exception as e:  # noqa: BLE001
                         problems.append(f"{pf.name}: profile unreadable ({e})")
                 env.append({
