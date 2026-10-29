@@ -970,6 +970,7 @@
     ["srw3", "0–3 km mean storm-relative wind", "m s⁻¹"],
     ["lr03", "Sfc–3 km lapse rate", "°C km⁻¹"], ["lr36", "3–6 km lapse rate", "°C km⁻¹"],
     ["lr85", "850–500 hPa lapse rate", "°C km⁻¹"], ["lr75", "700–500 hPa lapse rate", "°C km⁻¹"],
+    ["stp_eff_obs", "Effective-layer STP (with CIN)", "dimensionless"], ["scp_obs", "SCP", "dimensionless"],
   ];
   function envSample(sel) {
     const mode = $("envClass").value, subset = $("envSubset").value;
@@ -1087,7 +1088,7 @@
       const svg = violinSVG(groups, u);
       const md = (gr) => (gr.stats.med == null ? "—" : nf(gr.stats.med, Math.abs(gr.stats.med) < 100 ? 1 : 0));
       envStatsCache[vi] = { groups, label, u };
-      return `<div class="card violin-card" data-vi="${vi}"><h2>${label} <span class="unit">(${u})</span></h2><p class="hint">Medians: <span style="color:${torC};font-weight:600">${md(groups[0])}</span> vs. <span style="color:${nonC};font-weight:600">${md(groups[2])}</span>${pctDiff(groups[0].stats.med, groups[2].stats.med, torC)}</p>${svg}</div>`;
+      return `<div class="card violin-card" data-vi="${vi}"><h2>${label}${u === "dimensionless" ? "" : ` <span class="unit">(${u})</span>`}</h2><p class="hint">Medians: <span style="color:${torC};font-weight:600">${md(groups[0])}</span> vs. <span style="color:${nonC};font-weight:600">${md(groups[2])}</span>${pctDiff(groups[0].stats.med, groups[2].stats.med, torC)}</p>${svg}</div>`;
     }).join("");
   }
   const envStatsCache = {};
@@ -1096,7 +1097,7 @@
     if (!v || !card) { tipEl.style.opacity = 0; return; }
     const { groups, u } = envStatsCache[+card.dataset.vi], gr = groups[+v.dataset.g], s = gr.stats;
     const r1 = (x) => (x == null ? "—" : nf(x, Math.abs(x) < 100 ? 1 : 0));
-    tipEl.innerHTML = `<b>${gr.name}</b>n = ${s.n}<br>Median ${r1(s.med)} ${u}<br>IQR ${r1(s.q1)} – ${r1(s.q3)}<br>Mean ${r1(s.mean)}`;
+    tipEl.innerHTML = `<b>${gr.name}</b>n = ${s.n}<br>Median ${r1(s.med)} ${u === "dimensionless" ? "" : u}<br>IQR ${r1(s.q1)} – ${r1(s.q3)}<br>Mean ${r1(s.mean)}`;
     tipEl.style.left = `${ev.pageX}px`; tipEl.style.top = `${ev.pageY - 6}px`; tipEl.style.opacity = 1;
   });
   $("violins").addEventListener("mouseleave", () => (tipEl.style.opacity = 0));
