@@ -141,8 +141,10 @@ def group(tracks: list[Track], p: Params) -> pd.DataFrame:
     return df
 
 
-def to_tracks_csv(df: pd.DataFrame) -> str:
-    """Same layout as the files in tracks/ (no tornado links; dissipation / primary_sup left blank)."""
+def to_tracks_csv(df: pd.DataFrame, lag_s: float = 0.0) -> str:
+    """Same layout as the files in tracks/ (no tornado links; dissipation / primary_sup left blank).
+    Times are MRMS frame times minus lag_s (the MRMS-vs-track time offset, common.MRMS_LAG_S)."""
     out = df.sort_values(["supercell_id", "meso_id", "t"]).assign(dissipation="", primary_sup="")
+    out["time_utc"] = pd.to_datetime(out["t"] - lag_s, unit="s", utc=True).dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
     return out[["supercell_id", "meso_id", "time_utc", "lat", "lon", "dissipation", "primary_sup"]].round(
         {"lat": 5, "lon": 5}).to_csv(index=False, lineterminator="\n")

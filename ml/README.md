@@ -31,12 +31,30 @@ track.
 Each track file's analysis window runs from 1 h before its first tracked scan to 1 h after its
 last.
 
+## Stage 1 findings (`diagnostics/`)
+
+- **MRMS sees almost all tracked mesos.** 3–6 km AzShear has a value at 99% of tracked positions,
+  and coverage barely changes out to 200 km from the nearest WSR-88D. Signal strength drops with
+  range: 43% of positions within 50 km reach ≥ 5 × 10⁻³ s⁻¹, vs. about 20% beyond 50 km
+  (`azshear_vs_range.png`).
+- **Time offset of about 6 minutes.** An MRMS AzShear frame stamped T shows each meso where the
+  Level II track puts it at about T − 6 min. Mean peak AzShear along the tracks doubles when this
+  offset is applied, in both 0–2 and 3–6 km and on both a 2022 and a 2023 day (`lag.png`,
+  `lag.json`). The model therefore labels each frame with track positions 350 s earlier, and
+  reports predicted tracks at frame time − 350 s (`common.MRMS_LAG_S`). Without the correction, the
+  AzShear maximum sits a median ~7 km behind the tracked position (`offsets.png`).
+- Built 5,950 frames over 30 days (4.0 GB) with no failed downloads.
+
 ## Files
 
 | file | what |
 |---|---|
 | `common.py` | grid, Southeast mask, radar distance / beam height, track reading and interpolation |
 | `diag_tracks.py` | MRMS AzShear at tracked positions vs. distance to the nearest WSR-88D → `diagnostics/` |
+| `diag_lag.py` | MRMS-vs-track time offset → `diagnostics/lag.*` |
+| `stage1_report.py` | per-day frame/label counts and AzShear-max offsets → `diagnostics/` |
+| `frames.py`, `make_patches.py`, `model.py`, `train.py` | stage 2: patches, MesoNet (small U-Net), CPU training (`.github/workflows/ml-train.yml`) |
+| `detect.py`, `track.py`, `score_tracks.py`, `run_tracking.py` | stages 3–4: detection (`.github/workflows/ml-detect.yml`), tracking, tuning, scoring |
 | `build_frames.py` | one event day → `frames/*.npz`, `frames.csv`, `labels.csv`, `offsets.csv` (run by `.github/workflows/ml-frames.yml`) |
 | `static/nexrad_sites.csv` | CONUS WSR-88D locations (from Py-ART) |
 | `static/se_states.geojson` | the seven Southeast states (coarse outlines) |

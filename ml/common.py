@@ -154,6 +154,40 @@ def read_tracks(tracks_dir: Path | str = REPO / "tracks") -> pd.DataFrame:
     return tr.reset_index(drop=True)
 
 
+# MRMS AzShear at a nominal valid time T shows mesocyclones where the Level II tracks put them about
+# 6 minutes earlier (stage 1 lag analysis, ml/diagnostics/lag.json). Frames are therefore labeled with
+# track positions at T - MRMS_LAG_S, and predicted tracks are reported at T - MRMS_LAG_S.
+MRMS_LAG_S = 350.0
+
+
+class TrackIndex:
+    """Fast repeated interpolation of all meso tracks."""
+
+    def __init__(self, tr: pd.DataFrame):
+        self.g = []
+        for (f, sc, ms), g in tr.groupby(["file", "supercell", "meso"], sort=False):
+            r0 = g.iloc[0]
+            self.g.append((f, sc, ms, r0["label"], g["t"].to_numpy(), g["lat"].to_numpy(), g["lon"].to_numpy(),
+                           bool(r0["tornadic"]), bool(r0["sc_tornadic"])))
+        self.t0 = np.array([x[4][0] for x in self.g])
+        self.t1 = np.array([x[4][-1] for x in self.g])
+
+    def at(self, t: float, single_scan_tol: float = 120.0) -> pd.DataFrame:
+        out = []
+        for k in np.where((self.t0 - single_scan_tol <= t) & (self.t1 + single_scan_tol >= t))[0]:
+            f, sc, ms, lab, ts, la, lo, tor, sctor = self.g[k]
+            if len(ts) == 1:
+                if abs(ts[0] - t) > single_scan_tol:
+                    continue
+                y, x = la[0], lo[0]
+            else:
+                if t < ts[0] or t > ts[-1]:
+                    continue
+                y, x = float(np.interp(t, ts, la)), float(np.interp(t, ts, lo))
+            out.append((f, sc, ms, lab, y, x, tor, sctor))
+        return pd.DataFrame(out, columns=["file", "supercell", "meso", "label", "lat", "lon", "tornadic", "sc_tornadic"])
+
+
 def meso_positions_at(tr: pd.DataFrame, t: float, single_scan_tol: float = 120.0) -> pd.DataFrame:
     """Every meso active at time t (epoch s), linearly interpolated (no extrapolation)."""
     out = []

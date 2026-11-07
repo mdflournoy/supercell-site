@@ -1,0 +1,22 @@
+{
+ "labels": 13026,
+ "with_az_value": 13007,
+ "dist_km_median": 4.74,
+ "within_2km": 0.096,
+ "within_4km": 0.362,
+ "along_km_median": -2.74,
+ "across_km_median": 0.6,
+ "along_km_mean": -2.03,
+ "storm_speed_median": 18.1,
+ "lag_min_median": -2.6,
+ "by_year": {
+  "2022": {
+   "along_km_median": -2.65,
+   "n": 8899
+  },
+  "2023": {
+   "along_km_median": -2.98,
+   "n": 4077
+  }
+ }
+}

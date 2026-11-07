@@ -8,7 +8,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from common import DX_AZ, box_shape, radar_fields, se_mask
+from common import (DX_AZ, MRMS_LAG_S, TrackIndex, box_shape, in_southeast, latlon_to_rc, radar_fields,
+                    read_tracks, se_mask)
+
+
+@lru_cache(maxsize=1)
+def _track_index():
+    return TrackIndex(read_tracks())
 
 NCH = 7  # az36, az02, ref, az36_prev, az02_prev, ref_prev, beam
 PREV_MAX_DT = 330  # s; older previous frames are replaced by the current frame
@@ -19,11 +25,24 @@ KM_PER_PX = DX_AZ * 111.2
 class Day:
     """One event day extracted from its release tar (a folder with frames/, frames.csv, labels.csv)."""
 
-    def __init__(self, folder: Path | str):
+    def __init__(self, folder: Path | str, lag_s: float = MRMS_LAG_S):
+        """Labels are recomputed from tracks/ at (frame time - lag_s); see common.MRMS_LAG_S."""
         self.dir = Path(folder)
         self.file = self.dir.name
         self.frames = pd.read_csv(self.dir / "frames.csv").sort_values("t").reset_index(drop=True)
-        lab = pd.read_csv(self.dir / "labels.csv", dtype={"file": str, "supercell": str, "meso": str})
+        idx = _track_index()
+        parts = []
+        for name, t in zip(self.frames.name, self.frames.t):
+            p = idx.at(t - lag_s)
+            if len(p):
+                p.insert(0, "frame", name); p.insert(1, "t", t)
+                parts.append(p)
+        lab = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(
+            columns=["frame", "t", "file", "supercell", "meso", "label", "lat", "lon", "tornadic", "sc_tornadic"])
+        if len(lab):
+            r, c = latlon_to_rc(lab["lat"], lab["lon"])
+            lab["row"], lab["col"] = r, c
+            lab["in_se"] = in_southeast(lab["lat"].to_numpy(), lab["lon"].to_numpy())
         self.labels = lab
         self.by_frame = {k: g for k, g in lab.groupby("frame")}
 

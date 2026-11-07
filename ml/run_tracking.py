@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from common import ML_DIR
+from common import ML_DIR, MRMS_LAG_S
 from score_tracks import score_day
 from track import Params, group, link, to_tracks_csv
 
@@ -92,7 +92,7 @@ def main() -> None:
         for d in days:
             det, times, lab = data[d]
             pred = run(det[det.method == method], times, p)
-            (out / "pred_tracks" / method / f"{d}.csv").write_text(to_tracks_csv(pred) if len(pred) else "")
+            (out / "pred_tracks" / method / f"{d}.csv").write_text(to_tracks_csv(pred, MRMS_LAG_S) if len(pred) else "")
             r = score_day(pred, lab)
             scores.append({"day": d, "set": "test" if d in test else "validation", "method": method, **r})
     sc = pd.DataFrame(scores)
