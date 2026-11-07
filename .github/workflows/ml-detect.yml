@@ -1,0 +1,55 @@
+name: ML stage 3-4 - detect mesos on held-out days
+
+# Runs the trained MesoNet (and the AzShear-threshold baseline) over every frame of the given days
+# and stores the per-frame detections in the "ml-detections-v1" pre-release. Tracking, tuning and
+# scoring then use these small CSVs (ml/run_tracking.py).
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days (held-out 2022 validation days + 2023 test days)"
+        default: "20220322 20220415 20220203 20230323 20230324 20230325 20230331 20230614"
+      model_tag:
+        description: "Release holding mesonet.pt"
+        default: "ml-model-v1"
+      tag:
+        description: "Release for the detections"
+        default: "ml-detections-v1"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      days: ${{ steps.p.outputs.days }}
+    steps:
+      - id: p
+        run: echo "days=$(printf '%s\n' ${{ inputs.days }} | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view ${{ inputs.tag }} -R ${{ github.repository }} >/dev/null 2>&1 || gh release create ${{ inputs.tag }} \
+            -R ${{ github.repository }} --prerelease --title "ML meso detections (stages 3-4)" \
+            --notes "Per-frame MesoNet and baseline detections for the held-out 2022 days and the 2023 test days (ml/detect.py)."
+
+  detect:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        day: ${{ fromJson(needs.plan.outputs.days) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib && pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release download ml-frames-v1 -R ${{ github.repository }} -p "${{ matrix.day }}.tar" -D tars
+          gh release download ${{ inputs.model_tag }} -R ${{ github.repository }} -p "mesonet.pt" -D model
+      - run: python ml/detect.py --tar tars/${{ matrix.day }}.tar --model model/mesonet.pt --out det
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release upload ${{ inputs.tag }} -R ${{ github.repository }} det/* --clobber
