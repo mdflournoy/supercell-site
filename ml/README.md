@@ -23,7 +23,7 @@ It is trained on the 2022 events and tested on the 2023 events, which it never s
 
 ## Truth region
 
-Every supercell whose track entered **AR, LA, MS, AL, GA, TN or KY** (`data/se_states.geojson`) was
+Every supercell whose track entered **AR, LA, MS, AL, GA, TN or KY** (`static/se_states.geojson`) was
 tracked. So inside those states, anything without a track is "no mesocyclone". Outside them, the
 truth is known only near tracks. Detections outside the region are ignored unless they match a
 track.
@@ -38,8 +38,8 @@ last.
 | `common.py` | grid, Southeast mask, radar distance / beam height, track reading and interpolation |
 | `diag_tracks.py` | MRMS AzShear at tracked positions vs. distance to the nearest WSR-88D → `diagnostics/` |
 | `build_frames.py` | one event day → `frames/*.npz`, `frames.csv`, `labels.csv`, `offsets.csv` (run by `.github/workflows/ml-frames.yml`) |
-| `data/nexrad_sites.csv` | CONUS WSR-88D locations (from Py-ART) |
-| `data/se_states.geojson` | the seven Southeast states (coarse outlines) |
+| `static/nexrad_sites.csv` | CONUS WSR-88D locations (from Py-ART) |
+| `static/se_states.geojson` | the seven Southeast states (coarse outlines) |
 
 ### Frame encoding
 

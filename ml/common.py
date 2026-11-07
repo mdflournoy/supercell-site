@@ -10,7 +10,7 @@ Labels
     within ±2 min of its scan.
 
 Southeast region
-    AR, LA, MS, AL, GA, TN, KY (ml/data/se_states.geojson). Every supercell whose track entered these
+    AR, LA, MS, AL, GA, TN, KY (ml/static/se_states.geojson). Every supercell whose track entered these
     states was tracked, so inside them anything untracked is "no mesocyclone". Outside them the
     truth is unknown except near tracks.
 """
@@ -54,7 +54,7 @@ def latlon_to_rc(lat, lon, dx: float = DX_AZ):
 
 # ---------------------------------------------------------------------------- radars
 def radar_sites() -> pd.DataFrame:
-    return pd.read_csv(ML_DIR / "data" / "nexrad_sites.csv")
+    return pd.read_csv(ML_DIR / "static" / "nexrad_sites.csv")
 
 
 def radar_fields(dx: float = DX_AZ, max_range_km: float = 460.0):
@@ -99,7 +99,7 @@ def nearest_radar(lat, lon):
 
 # ---------------------------------------------------------------------------- Southeast mask
 def se_polygons():
-    g = json.loads((ML_DIR / "data" / "se_states.geojson").read_text())
+    g = json.loads((ML_DIR / "static" / "se_states.geojson").read_text())
     polys = []
     for f in g["features"]:
         geom = f["geometry"]
