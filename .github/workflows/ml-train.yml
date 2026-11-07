@@ -1,0 +1,83 @@
+name: ML stage 2 - train the meso detector
+
+# Cuts training patches from the 2022 frames (except the held-out validation days), trains MesoNet on
+# CPU, tunes the detection threshold on the held-out days, and stores the model in the "ml-model-v1"
+# pre-release. Manual only; the 2023 days are never used here.
+on:
+  workflow_dispatch:
+    inputs:
+      val_days:
+        description: "Held-out 2022 validation days"
+        default: "20220322 20220415 20220203"
+      max_minutes:
+        description: "Training + validation time budget (minutes)"
+        default: "300"
+      tag:
+        description: "Release tag for the trained model"
+        default: "ml-model-v1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ml-train
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      train: ${{ steps.p.outputs.train }}
+    steps:
+      - id: p
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          all=$(gh release view ml-frames-v1 -R ${{ github.repository }} --json assets -q '.assets[].name' | grep -E '^2022[0-9]{4}\.tar$' | sed 's/\.tar$//')
+          train=$(for d in $all; do case " ${{ inputs.val_days }} " in *" $d "*) ;; *) echo $d;; esac; done)
+          echo "train=$(printf '%s\n' $train | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+
+  patches:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        day: ${{ fromJson(needs.plan.outputs.train) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release download ml-frames-v1 -R ${{ github.repository }} -p "${{ matrix.day }}.tar" -D tars
+      - run: python ml/make_patches.py --tar tars/${{ matrix.day }}.tar --out patches
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patches-${{ matrix.day }}
+          path: patches/
+          retention-days: 30
+
+  train:
+    needs: patches
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib && pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - uses: actions/download-artifact@v4
+        with: { pattern: "patches-*", path: patches, merge-multiple: true }
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: for d in ${{ inputs.val_days }}; do gh release download ml-frames-v1 -R ${{ github.repository }} -p "$d.tar" -D tars; done
+      - run: |
+          python ml/train.py --patches patches --val-tars $(for d in ${{ inputs.val_days }}; do echo tars/$d.tar; done) \
+            --out model --max-minutes ${{ inputs.max_minutes }} --threads 4
+      - name: Store the model
+        if: ${{ !cancelled() }}
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view ${{ inputs.tag }} >/dev/null 2>&1 || gh release create ${{ inputs.tag }} --prerelease \
+            --title "ML meso detector (stage 2)" --notes "MesoNet weights trained on 2022 frames (ml/train.py). See train_meta.json."
+          gh release upload ${{ inputs.tag }} model/* --clobber
