@@ -1,0 +1,67 @@
+name: ML stage 1 - build MRMS frames
+
+# Builds the model's input frames (MRMS 0-2 km and 3-6 km AzShear + composite reflectivity, every
+# ~4 min, cropped to the Southeast) and labels for each track file, and stores each day as an asset
+# of the "ml-frames-v1" pre-release. Manual only; does not touch the website.
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Track files to build (space-separated YYYYMMDD; blank = all)"
+        required: false
+        default: ""
+      max_frames:
+        description: "Testing: frames per file (0 = all)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ml-frames
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      files: ${{ steps.p.outputs.files }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          if [ -n "${{ inputs.files }}" ]; then list="${{ inputs.files }}"; else list=$(ls tracks | grep -E '^[0-9]{8}\.csv$' | sed 's/\.csv$//'); fi
+          echo "files=$(printf '%s\n' $list | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+      - name: Make sure the release exists
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view ml-frames-v1 >/dev/null 2>&1 || gh release create ml-frames-v1 --prerelease \
+            --title "ML training data: MRMS frames (stage 1)" \
+            --notes "Model inputs for the mesocyclone-tracking experiment in ml/: per event day, MRMS 0-2 km and 3-6 km AzShear and composite reflectivity cropped to the Southeast every ~4 min, with labels from tracks/. Built by .github/workflows/ml-frames.yml."
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        file: ${{ fromJson(needs.plan.outputs.files) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas requests pygrib matplotlib
+      - name: Build frames for ${{ matrix.file }}
+        run: python ml/build_frames.py --file ${{ matrix.file }} --out ml-out --max-frames ${{ inputs.max_frames || 0 }}
+      - name: Upload to the release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cd ml-out
+          tar -cf ${{ matrix.file }}.tar ${{ matrix.file }}
+          for f in frames labels offsets; do cp ${{ matrix.file }}/$f.csv ${{ matrix.file }}_$f.csv; done
+          cp ${{ matrix.file }}/status.json ${{ matrix.file }}_status.json
+          gh release upload ml-frames-v1 ${{ matrix.file }}.tar ${{ matrix.file }}_frames.csv ${{ matrix.file }}_labels.csv \
+            ${{ matrix.file }}_offsets.csv ${{ matrix.file }}_status.json --clobber

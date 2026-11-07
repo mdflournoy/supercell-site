@@ -1,0 +1,63 @@
+{
+ "meso_times": 26045,
+ "mesos": 575,
+ "mid_missing_frac": 0.009,
+ "mid_ge3_frac": 0.586,
+ "mid_ge5_frac": 0.245,
+ "mesos_mid_max_lt3": 12,
+ "mesos_mid_max_lt5": 91,
+ "median_mid_by_tornadic": {
+  "false": 3.0,
+  "true": 3.0
+ },
+ "by_range": {
+  "0-50 km": {
+   "n": 5755.0,
+   "beam_height_m_median": 384.0,
+   "mid_missing_frac": 0.004,
+   "mid_median": 4.0,
+   "mid_ge3_frac": 0.739,
+   "mid_ge5_frac": 0.427,
+   "mid_ge8_frac": 0.128,
+   "low_missing_frac": 0.012,
+   "low_median": 3.0,
+   "low_ge5_frac": 0.319
+  },
+  "50-100 km": {
+   "n": 12222.0,
+   "beam_height_m_median": 969.0,
+   "mid_missing_frac": 0.009,
+   "mid_median": 3.0,
+   "mid_ge3_frac": 0.558,
+   "mid_ge5_frac": 0.202,
+   "mid_ge8_frac": 0.041,
+   "low_missing_frac": 0.009,
+   "low_median": 3.0,
+   "low_ge5_frac": 0.324
+  },
+  "100-150 km": {
+   "n": 7275.0,
+   "beam_height_m_median": 1818.0,
+   "mid_missing_frac": 0.013,
+   "mid_median": 3.0,
+   "mid_ge3_frac": 0.517,
+   "mid_ge5_frac": 0.177,
+   "mid_ge8_frac": 0.033,
+   "low_missing_frac": 0.013,
+   "low_median": 3.0,
+   "low_ge5_frac": 0.251
+  },
+  "150-200 km": {
+   "n": 793.0,
+   "beam_height_m_median": 2908.0,
+   "mid_missing_frac": 0.008,
+   "mid_median": 3.0,
+   "mid_ge3_frac": 0.535,
+   "mid_ge5_frac": 0.222,
+   "mid_ge8_frac": 0.039,
+   "low_missing_frac": 0.006,
+   "low_median": 2.0,
+   "low_ge5_frac": 0.194
+  }
+ }
+}
