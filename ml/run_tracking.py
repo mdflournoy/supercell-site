@@ -41,10 +41,10 @@ def run(det, times, p: Params):
 
 def grid(method: str):
     if method == "model":
-        starts, conts = [0.2, 0.3, 0.4, 0.5], [0.1, 0.15, 0.2, 0.3]
+        starts, conts, lens = [0.2, 0.3, 0.4, 0.5, 0.6], [0.1, 0.15, 0.2, 0.3, 0.4], [2, 3, 4, 6]
     else:
-        starts, conts = [6, 8, 10, 12], [3, 4, 5, 6]
-    for s, c, ml, jk in itertools.product(starts, conts, [2, 3, 4, 5], [15.0, 25.0]):
+        starts, conts, lens = [6, 8, 10, 12, 15], [3, 4, 5, 6, 8], [3, 5, 8]
+    for s, c, ml, jk in itertools.product(starts, conts, lens, [15.0, 25.0]):
         if c <= s:
             yield Params(start_thr=s, cont_thr=c, min_len=ml, join_km=jk)
 
