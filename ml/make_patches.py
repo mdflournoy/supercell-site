@@ -44,8 +44,8 @@ def main() -> None:
 
     def add(az, ref, r0, c0, kind, fi, lab_rc):
         r0 = int(np.clip(r0, 0, H - P)); c0 = int(np.clip(c0, 0, W - P))
-        AZ.append(az[:, r0:r0 + P, c0:c0 + P]); REF.append(ref[:, r0:r0 + P, c0:c0 + P])
-        BEAM.append(beam[r0:r0 + P, c0:c0 + P]); ORIG.append((r0, c0)); KIND.append(kind); FRAME.append(fi)
+        AZ.append(az[:, r0:r0 + P, c0:c0 + P].copy()); REF.append(ref[:, r0:r0 + P, c0:c0 + P].copy())
+        BEAM.append(beam[r0:r0 + P, c0:c0 + P].copy()); ORIG.append((r0, c0)); KIND.append(kind); FRAME.append(fi)
         inside = [(r - r0, c - c0, k) for k, (r, c) in enumerate(lab_rc) if 0 <= r - r0 < P and 0 <= c - c0 < P]
         PTS.append(inside)
 
