@@ -1,0 +1,46 @@
+name: ML - add reflectivity to detections
+
+# Adds dbz5 / dbz10 (max composite reflectivity within ~5 / ~10 km) to the stored per-frame
+# detections of a detections release, in place (ml/add_dbz.py). No model inference.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days"
+        default: "20220322 20220415 20220203 20230323 20230324 20230325 20230331 20230614"
+      tag:
+        description: "Detections release to update"
+        default: "ml-detections-v2"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      days: ${{ steps.p.outputs.days }}
+    steps:
+      - id: p
+        run: echo "days=$(printf '%s\n' ${{ inputs.days }} | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+
+  dbz:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        day: ${{ fromJson(needs.plan.outputs.days) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas && pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release download ml-frames-v1 -R ${{ github.repository }} -p "${{ matrix.day }}.tar" -D tars
+          gh release download ${{ inputs.tag }} -R ${{ github.repository }} -p "${{ matrix.day }}_detections.csv.gz" -D det
+      - run: python ml/add_dbz.py --tar tars/${{ matrix.day }}.tar --det det/${{ matrix.day }}_detections.csv.gz
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release upload ${{ inputs.tag }} -R ${{ github.repository }} det/${{ matrix.day }}_detections.csv.gz --clobber

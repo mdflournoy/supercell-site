@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import DX_AZ, LAT1, LON0  # noqa: E402
 from frames import Day, extract, stack_raw, static_fields, to_input  # noqa: E402
 from model import MesoNet, peaks, predict_full  # noqa: E402
+from add_dbz import add_columns  # noqa: E402
 
 
 def rc_to_latlon(r, c):
@@ -72,8 +73,8 @@ def main() -> None:
             print(f"{day.file}: frame {fi + 1}/{len(day)} ({(time.time() - t0) / (fi + 1):.1f} s/frame)", flush=True)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows, columns=["frame", "t", "method", "row", "col", "lat", "lon", "score", "in_se"]).to_csv(
-        out / f"{day.file}_detections.csv.gz", index=False)
+    det = pd.DataFrame(rows, columns=["frame", "t", "method", "row", "col", "lat", "lon", "score", "in_se"])
+    add_columns(det, day).to_csv(out / f"{day.file}_detections.csv.gz", index=False)  # + dbz5, dbz10
     day.frames[["name", "t"]].to_csv(out / f"{day.file}_frames.csv", index=False)
     day.labels.to_csv(out / f"{day.file}_labels.csv.gz", index=False)
     print(f"done in {(time.time() - t0) / 60:.1f} min")
