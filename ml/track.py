@@ -7,6 +7,8 @@ Meso linking (frame to frame, ~4 min apart)
   * a track can only START on a detection with score >= start_thr, but can CONTINUE on weaker
     detections (score >= cont_thr) — hysteresis that keeps tracks whole through weak periods;
   * tracks with fewer than MIN_LEN detections are dropped.
+  * reflectivity (when the detections carry dbz5 = max composite dBZ within ~5 km):
+    detections with dbz5 < dbz_min are ignored, and tracks whose median dbz5 < trk_dbz are dropped.
 
 Supercell grouping (cyclic mesocyclogenesis)
   A new meso track joins the supercell of an existing meso track if, when it starts, that track is
@@ -33,6 +35,8 @@ class Params:
     min_len: int = 3
     join_km: float = 20.0
     join_min: float = 20.0
+    dbz_min: float = -99.0
+    trk_dbz: float = -99.0
 
 
 @dataclass
@@ -43,6 +47,7 @@ class Track:
     lon: list = field(default_factory=list)
     score: list = field(default_factory=list)
     misses: int = 0
+    dbz: list = field(default_factory=list)
 
     def predict(self, t: float):
         if len(self.t) < 2:
@@ -62,11 +67,17 @@ def km(lat1, lon1, lat2, lon2):
 
 def link(det: pd.DataFrame, times: np.ndarray, p: Params) -> list[Track]:
     """det: one method's detections (t, lat, lon, score). times: all frame times (sorted)."""
-    by_t = {t: g for t, g in det[det.score >= p.cont_thr].groupby("t")}
+    keep = det.score >= p.cont_thr
+    if "dbz5" in det:
+        keep &= det.dbz5 >= p.dbz_min
+        det = det.assign(_dbz=det.dbz5)
+    else:
+        det = det.assign(_dbz=np.nan)
+    by_t = {t: g for t, g in det[keep].groupby("t")}
     live, done, nid = [], [], 0
     for t in times:
         g = by_t.get(t)
-        cand = g[["lat", "lon", "score"]].to_numpy() if g is not None else np.zeros((0, 3))
+        cand = g[["lat", "lon", "score", "_dbz"]].to_numpy() if g is not None else np.zeros((0, 4))
         used = np.zeros(len(cand), bool)
         if live and len(cand):
             pred = np.array([tr.predict(t) for tr in live])
@@ -81,7 +92,7 @@ def link(det: pd.DataFrame, times: np.ndarray, p: Params) -> list[Track]:
                     continue
                 assigned.add(i); used[j] = True
                 tr = live[i]
-                tr.t.append(t); tr.lat.append(cand[j, 0]); tr.lon.append(cand[j, 1]); tr.score.append(cand[j, 2]); tr.misses = 0
+                tr.t.append(t); tr.lat.append(cand[j, 0]); tr.lon.append(cand[j, 1]); tr.score.append(cand[j, 2]); tr.dbz.append(cand[j, 3]); tr.misses = 0
             for i, tr in enumerate(live):
                 if i not in assigned:
                     tr.misses += 1
@@ -94,9 +105,12 @@ def link(det: pd.DataFrame, times: np.ndarray, p: Params) -> list[Track]:
         live = still
         for j in np.where(~used)[0]:
             if cand[j, 2] >= p.start_thr:
-                live.append(Track(nid, [t], [cand[j, 0]], [cand[j, 1]], [cand[j, 2]])); nid += 1
+                live.append(Track(nid, [t], [cand[j, 0]], [cand[j, 1]], [cand[j, 2]], dbz=[cand[j, 3]])); nid += 1
     done += live
-    return [tr for tr in done if len(tr.t) >= p.min_len]
+    out = [tr for tr in done if len(tr.t) >= p.min_len]
+    if p.trk_dbz > -99:
+        out = [tr for tr in out if not np.isfinite(np.nanmedian(tr.dbz)) or np.nanmedian(tr.dbz) >= p.trk_dbz]
+    return out
 
 
 def letters(n: int) -> str:

@@ -25,6 +25,7 @@ from score_tracks import score_day
 from track import Params, group, link, to_tracks_csv
 
 VAL = ["20220322", "20220415", "20220203"]
+REFL = False  # set from --refl
 
 
 def load(det_dir: Path, day: str):
@@ -44,9 +45,12 @@ def grid(method: str):
         starts, conts, lens = [0.2, 0.3, 0.4, 0.5, 0.6], [0.1, 0.15, 0.2, 0.3, 0.4], [2, 3, 4, 6]
     else:
         starts, conts, lens = [6, 8, 10, 12, 15], [3, 4, 5, 6, 8], [3, 5, 8]
-    for s, c, ml, jk in itertools.product(starts, conts, lens, [15.0, 25.0]):
+    # reflectivity gates (model only; the baseline already requires >= 35 dBZ within 5 km)
+    dbz = [(-99.0, -99.0)] if method != "model" or not REFL else \
+        [(d, t) for d in (-99.0, 30.0, 35.0, 40.0) for t in (-99.0, 40.0, 45.0, 50.0)]
+    for s, c, ml, jk, (dm, td) in itertools.product(starts, conts, lens, [15.0, 25.0], dbz):
         if c <= s:
-            yield Params(start_thr=s, cont_thr=c, min_len=ml, join_km=jk)
+            yield Params(start_thr=s, cont_thr=c, min_len=ml, join_km=jk, dbz_min=dm, trk_dbz=td)
 
 
 def pooled(rows: list[dict]) -> dict:
@@ -62,9 +66,14 @@ def pooled(rows: list[dict]) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--det", required=True)
+    ap.add_argument("--refl", action="store_true", help="also tune reflectivity gates (needs dbz5 in detections)")
+    ap.add_argument("--out", default=str(ML_DIR / "results"))
     a = ap.parse_args()
+    global REFL
+    REFL = a.refl
     det_dir = Path(a.det)
-    out = ML_DIR / "results"
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
     days = sorted(p.name[:8] for p in det_dir.glob("*_detections.csv.gz"))
     test = [d for d in days if d.startswith("2023")]
     data = {d: load(det_dir, d) for d in days}
