@@ -1,0 +1,63 @@
+[   0.6 min] 16698 patches from 22 days: pos 6958, hard neg 6427, random 3313; 13151 meso centers
+[   0.6 min] MesoNet: 0.89 M parameters
+[   1.2 min] ~3.62 s/step → planning 3775 steps (~3.6 epochs)
+[   6.7 min] epoch 0 step 200: loss 2.961
+[  12.9 min] epoch 0 step 400: loss 2.892
+[  19.0 min] epoch 0 step 600: loss 2.831
+[  25.2 min] epoch 0 step 800: loss 2.803
+[  31.4 min] epoch 0 step 1000: loss 2.785
+[  32.7 min] epoch 1 done: mean loss 2.777
+[  37.4 min] epoch 1 step 1200: loss 2.644
+[  43.4 min] epoch 1 step 1400: loss 2.670
+[  49.3 min] epoch 1 step 1600: loss 2.665
+[  55.3 min] epoch 1 step 1800: loss 2.647
+[  61.2 min] epoch 1 step 2000: loss 2.635
+[  63.9 min] epoch 2 done: mean loss 2.626
+[  67.2 min] epoch 2 step 2200: loss 2.529
+[  73.3 min] epoch 2 step 2400: loss 2.544
+[  79.3 min] epoch 2 step 2600: loss 2.556
+[  85.3 min] epoch 2 step 2800: loss 2.556
+[  91.3 min] epoch 2 step 3000: loss 2.546
+[  95.3 min] epoch 3 done: mean loss 2.543
+[  97.4 min] epoch 3 step 3200: loss 2.499
+[ 103.4 min] epoch 3 step 3400: loss 2.489
+[ 109.4 min] epoch 3 step 3600: loss 2.494
+[ 115.3 min] epoch 3 step 3800: loss 2.494
+[ 121.4 min] epoch 3 step 4000: loss 2.498
+[ 126.7 min] epoch 4 done: mean loss 2.494
+[ 127.4 min] epoch 4 step 4200: loss 2.506
+[ 133.5 min] epoch 4 step 4400: loss 2.503
+[ 139.5 min] epoch 4 step 4600: loss 2.493
+[ 145.5 min] epoch 4 step 4800: loss 2.488
+[ 151.5 min] epoch 4 step 5000: loss 2.485
+[ 157.6 min] epoch 4 step 5200: loss 2.489
+[ 158.2 min] epoch 5 done: mean loss 2.492
+[ 163.6 min] epoch 5 step 5400: loss 2.515
+[ 169.6 min] epoch 5 step 5600: loss 2.497
+[ 175.5 min] epoch 5 step 5800: loss 2.493
+[ 181.5 min] epoch 5 step 6000: loss 2.496
+[ 187.5 min] epoch 5 step 6200: loss 2.492
+[ 189.4 min] epoch 6 done: mean loss 2.490
+[ 193.5 min] epoch 6 step 6400: loss 2.479
+[ 199.5 min] epoch 6 step 6600: loss 2.483
+[ 205.5 min] epoch 6 step 6800: loss 2.485
+[ 211.6 min] epoch 6 step 7000: loss 2.494
+[ 217.6 min] epoch 6 step 7200: loss 2.505
+[ 220.8 min] epoch 7 done: mean loss 2.503
+[ 223.6 min] epoch 7 step 7400: loss 2.487
+[ 229.6 min] epoch 7 step 7600: loss 2.480
+[ 235.7 min] epoch 7 step 7800: loss 2.480
+[ 240.0 min] epoch 8 done: mean loss 2.487
+[ 271.2 min]   validated 20220322: 66 frames so far
+[ 307.6 min]   validated 20220415: 142 frames so far
+[ 339.9 min]   validated 20220203: 204 frames so far
+[ 339.9 min] threshold  POD   FAR   CSI   hits misses false
+[ 339.9 min]   0.10   0.60  0.83  0.15    294   192  1477
+[ 339.9 min]   0.15   0.39  0.66  0.22    191   295   374
+[ 339.9 min]   0.20   0.14  0.51  0.12     68   418    72
+[ 339.9 min]   0.25   0.04  0.46  0.04     21   465    18
+[ 339.9 min]   0.30   0.01  0.40  0.01      3   483     2
+[ 339.9 min]   0.40   0.00  0.00  0.00      0   486     0
+[ 339.9 min]   0.50   0.00  0.00  0.00      0   486     0
+[ 339.9 min]   0.60   0.00  0.00  0.00      0   486     0
+[ 339.9 min] best threshold 0.15
