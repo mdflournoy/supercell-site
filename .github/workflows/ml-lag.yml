@@ -1,0 +1,43 @@
+name: ML diagnostic - MRMS vs track time offset, all days
+
+# Runs ml/diag_lag.py on every day's frames and stores lag_<day>.json in the "ml-diag-v1" pre-release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      days: ${{ steps.p.outputs.days }}
+    steps:
+      - id: p
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: echo "days=$(gh release view ml-frames-v1 -R ${{ github.repository }} --json assets -q '.assets[].name' | grep '\.tar$' | sed 's/\.tar$//' | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release view ml-diag-v1 -R ${{ github.repository }} >/dev/null 2>&1 || gh release create ml-diag-v1 \
+            -R ${{ github.repository }} --prerelease --title "ML diagnostics" --notes "Per-day MRMS vs track time offset (ml/diag_lag.py)."
+
+  lag:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 15
+      matrix:
+        day: ${{ fromJson(needs.plan.outputs.days) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release download ml-frames-v1 -R ${{ github.repository }} -p "${{ matrix.day }}.tar" -D tars
+          mkdir -p ex && tar -xf tars/${{ matrix.day }}.tar -C ex
+      - run: cd ml && python diag_lag.py --json ../lag_${{ matrix.day }}.json ../ex/${{ matrix.day }}
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release upload ml-diag-v1 -R ${{ github.repository }} lag_${{ matrix.day }}.json --clobber

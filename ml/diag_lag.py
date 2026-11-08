@@ -6,6 +6,7 @@ track puts the meso at T + tau, for tau = -12 … +12 min. The tau with the high
 the offset between the two time bases. Writes ml/diagnostics/lag.json and lag.png.
 
   python ml/diag_lag.py DAYDIR [DAYDIR ...]     (extracted frame folders from the ml-frames-v1 release)
+  python ml/diag_lag.py --json OUT.json DAYDIR  (one day, JSON only; used by ml-lag.yml)
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ import pandas as pd
 from common import DX_AZ, ML_DIR, TrackIndex, latlon_to_rc, read_tracks
 
 
-def main(dirs: list[str]) -> None:
+def main(dirs: list[str], json_out: str | None = None) -> None:
     tr = read_tracks()
     idx = TrackIndex(tr)
     taus = np.arange(-12, 12.5, 0.5) * 60
@@ -54,6 +55,10 @@ def main(dirs: list[str]) -> None:
         i = int(np.argmax(m))
         out[f"{k}_best_tau_min"] = taus[i] / 60
     out["n_per_tau"] = [len(acc["az36"][float(t)]) for t in taus]
+    if json_out:
+        Path(json_out).write_text(json.dumps(out, indent=1))
+        print({k: v for k, v in out.items() if k.endswith("best_tau_min")})
+        return
     (ML_DIR / "diagnostics" / "lag.json").write_text(json.dumps(out, indent=1))
     import matplotlib
     matplotlib.use("Agg")
@@ -71,4 +76,8 @@ def main(dirs: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    args = sys.argv[1:]
+    if args[:1] == ["--json"]:
+        main(args[2:], args[1])
+    else:
+        main(args)
