@@ -17,6 +17,9 @@ on:
         default: "0"
       tag:
         description: "Release tag for the trained model"
+        default: "ml-model-v2"
+      init_tag:
+        description: "Optional release whose mesonet.pt to start from (continue training); blank = from scratch"
         default: "ml-model-v1"
 
 permissions:
@@ -74,8 +77,12 @@ jobs:
         with: { pattern: "patches-*", path: patches, merge-multiple: true }
       - env: { GH_TOKEN: "${{ github.token }}" }
         run: for d in ${{ inputs.val_days }}; do gh release download ml-frames-v1 -R ${{ github.repository }} -p "$d.tar" -D tars; done
+      - if: ${{ inputs.init_tag != '' }}
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release download ${{ inputs.init_tag }} -R ${{ github.repository }} -p mesonet.pt -D init
       - run: |
-          python ml/train.py --patches patches --val-tars $(for d in ${{ inputs.val_days }}; do echo tars/$d.tar; done) \
+          python ml/train.py $([ -f init/mesonet.pt ] && echo --init init/mesonet.pt) \
+            --patches patches --val-tars $(for d in ${{ inputs.val_days }}; do echo tars/$d.tar; done) \
             --out model --max-minutes ${{ inputs.max_minutes }} --val-minutes ${{ inputs.val_minutes }} --threads 4
       - name: Store the model
         if: ${{ always() }}   # also after a timeout: mesonet.pt is saved after every epoch

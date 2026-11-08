@@ -93,6 +93,7 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=2e-3)
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--init", default=None, help="start from these weights (e.g. an earlier mesonet.pt)")
     a = ap.parse_args()
     t_start = time.time()
     torch.set_num_threads(a.threads)
@@ -112,12 +113,19 @@ def main() -> None:
         f"random {int((kind == 3).sum())}; {sum(len(b) for b in by)} meso centers")
 
     model = MesoNet()
+    if a.init:
+        model.load_state_dict(torch.load(a.init, map_location="cpu"))
+        log(f"initialized from {a.init}")
     log(f"MesoNet: {sum(p.numel() for p in model.parameters()) / 1e6:.2f} M parameters")
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
     budget = (a.max_minutes - a.val_minutes) * 60
     steps_per_epoch = math.ceil(n / a.batch)
-    # estimate total steps from the first 20 steps' speed, for the cosine schedule
-    step, epoch, total_steps = 0, 0, None
+    # LR: linear warm-up over WARMUP steps, then cosine decay over the elapsed fraction of the time
+    # budget (v1 planned steps from the first 20 steps' speed, which overestimated s/step 2x and
+    # left the LR at zero for the second half of training)
+    WARMUP = 100
+    step, epoch = 0, 0
+    t_train0 = time.time() - t_start
     hist = []
     while True:
         perm = rng.permutation(n)
@@ -130,15 +138,14 @@ def main() -> None:
             opt.zero_grad(); loss.backward(); opt.step()
             ep_loss += float(loss); k += 1; step += 1
             el = time.time() - t_start
+            frac = min(1.0, (el - t_train0) / max(1.0, budget - t_train0))
+            lr = a.lr * min(1.0, step / WARMUP) * (0.02 + 0.98 * 0.5 * (1 + math.cos(math.pi * frac)))
+            for g in opt.param_groups:
+                g["lr"] = lr
             if step == 20:
-                total_steps = int(budget / (el / 20) * 0.95)
-                log(f"~{el / 20:.2f} s/step → planning {total_steps} steps (~{total_steps / steps_per_epoch:.1f} epochs)")
-            if total_steps:
-                lr = a.lr * 0.5 * (1 + math.cos(math.pi * min(1.0, step / total_steps)))
-                for g in opt.param_groups:
-                    g["lr"] = lr
+                log(f"~{(time.time() - t_train0 - t_start) / 20:.2f} s/step")
             if step % 200 == 0:
-                log(f"epoch {epoch} step {step}: loss {ep_loss / k:.3f}")
+                log(f"epoch {epoch} step {step}: loss {ep_loss / k:.3f} lr {lr:.2e}")
             if el > budget:
                 break
         epoch += 1
