@@ -53,7 +53,7 @@ def frame_matches(pred: pd.DataFrame, truth: pd.DataFrame, max_km: float = MATCH
     return pd.DataFrame(out, columns=["t", "pkey", "tkey", "km"])
 
 
-def score_day(pred: pd.DataFrame, truth: pd.DataFrame) -> dict:
+def score_day(pred: pd.DataFrame, truth: pd.DataFrame, status: bool = False):
     """pred: supercell_id, meso_id, t, lat, lon (predicted, on frame times).
     truth: labels at the same frames: file, supercell, label, t, lat, lon."""
     pred = pred.copy()
@@ -128,4 +128,7 @@ def score_day(pred: pd.DataFrame, truth: pd.DataFrame) -> dict:
     }
     res["meso_csi"] = n_f / max(1, n_t + int(p_false.sum()))
     res["sc_csi"] = res["found_supercells"] / max(1, res["truth_supercells"] + res["false_supercells"])
+    if status:  # per-meso outcome, for maps: truth key -> found; predicted key -> ok / false / outside
+        pst = {k: ("ok" if p_ok[k] else "false" if p_false[k] else "outside") for k in p_ok.index}
+        return res, {k: bool(v) for k, v in found.items()}, pst, main_of
     return res

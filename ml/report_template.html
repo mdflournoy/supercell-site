@@ -1,0 +1,354 @@
+<title>MesoNet Track Verification</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: one reading column (scores, method) around a full-width map workbench. */
+:root {
+  --bg: #f6f7f8; --panel: #ffffff; --fg: #1b2129; --muted: #5d6773; --line: #d9dee4; --soft: #eceff2;
+  --accent: #2b5d8a;
+  --found: #3f9a6b; --missed: #e3902a;
+  --ok: #1d3f73; --false: #d1383d; --outside: #9aa3ad;
+  --state: #c5ccd4; --state-fill: #eef1f4;
+  --f-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161b; --panel: #1a1f26; --fg: #e4e8ec; --muted: #9aa4af; --line: #2e353e; --soft: #232931;
+  --accent: #7fb0dc; --found: #5cc28e; --missed: #f0a548; --ok: #9cc4f0; --false: #ff6b6f; --outside: #6c7580;
+  --state: #3a424c; --state-fill: #1e242b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12161b; --panel: #1a1f26; --fg: #e4e8ec; --muted: #9aa4af; --line: #2e353e; --soft: #232931;
+  --accent: #7fb0dc; --found: #5cc28e; --missed: #f0a548; --ok: #9cc4f0; --false: #ff6b6f; --outside: #6c7580;
+  --state: #3a424c; --state-fill: #1e242b; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px }
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px }
+.col { max-width: 760px }
+h1, h2 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; letter-spacing: -0.01em }
+h1 { font-size: clamp(28px, 4.2vw, 40px); line-height: 1.12 }
+h2 { font-size: 22px; line-height: 1.25 }
+p { margin: 0 }
+.eyebrow { font: 500 12px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
+header { display: flex; flex-direction: column; gap: 12px }
+.lede { color: var(--muted); font-size: 16px; max-width: 68ch }
+section { display: flex; flex-direction: column; gap: 14px }
+.note { color: var(--muted); font-size: 13.5px; max-width: 72ch }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel) }
+table { border-collapse: collapse; width: 100%; font-size: 14px }
+th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--soft); white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+thead th { font: 500 12px/1.3 var(--f-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); background: var(--soft); border-bottom: 1px solid var(--line) }
+tbody tr:last-child td { border-bottom: 0 }
+td.best { font-weight: 600 }
+td .sub { color: var(--muted); font-size: 12px; margin-left: 6px }
+tr.sep td { background: var(--soft); font: 500 11.5px/1 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding-block: 7px }
+tr.clickable { cursor: pointer }
+tr.clickable:hover td { background: var(--soft) }
+tr.current td { background: color-mix(in srgb, var(--accent) 12%, transparent) }
+
+/* workbench */
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start }
+@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr) } }
+.mapbox { position: relative; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; touch-action: none }
+.mapbox svg { display: block; width: 100%; height: auto; aspect-ratio: 1000 / 680; cursor: grab; user-select: none }
+.mapbox svg.dragging { cursor: grabbing }
+.zoom { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px }
+.zoom button { width: 30px; height: 30px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 4px; font: 500 16px/1 var(--f-mono); cursor: pointer }
+.zoom button:hover { background: var(--soft) }
+.daytitle { position: absolute; left: 12px; top: 10px; font: 500 12.5px/1.3 var(--f-mono); color: var(--muted); background: color-mix(in srgb, var(--panel) 85%, transparent); padding: 4px 7px; border-radius: 4px; pointer-events: none }
+.tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font: 12.5px/1.45 var(--f-body); padding: 7px 9px; border-radius: 4px; max-width: 260px; z-index: 5 }
+.tip b { font-weight: 600 }
+.side { display: flex; flex-direction: column; gap: 18px }
+.group { display: flex; flex-direction: column; gap: 8px }
+.group > .eyebrow { margin-bottom: 2px }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 4px; padding: 5px 9px; font: 500 13px/1.2 var(--f-mono); cursor: pointer; font-variant-numeric: tabular-nums }
+.chip:hover { border-color: var(--muted) }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+.chip:focus-visible, .zoom button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.legend { display: grid; grid-template-columns: 30px 1fr auto; gap: 6px 8px; align-items: center; font-size: 13px }
+.legend label { display: contents; cursor: pointer }
+.legend .count { font-family: var(--f-mono); color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums }
+.swatch { width: 30px; height: 10px }
+.statline { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px }
+.stat { display: flex; flex-direction: column; gap: 1px }
+.stat .v { font: 500 20px/1.15 var(--f-mono); font-variant-numeric: tabular-nums }
+.stat .k { font-size: 12px; color: var(--muted) }
+.timebox { display: flex; flex-direction: column; gap: 4px }
+.timebox input { width: 100% }
+.timebox .tval { font: 500 13px/1 var(--f-mono); color: var(--muted) }
+ul.method { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; max-width: 74ch }
+ul.method li::marker { color: var(--muted) }
+code { font-family: var(--f-mono); font-size: 0.92em; background: var(--soft); padding: 1px 4px; border-radius: 3px }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+
+<div class="wrap">
+  <header class="col">
+    <span class="eyebrow">Observational Database of Supercells · ML tracking test</span>
+    <h1>MesoNet track verification</h1>
+    <p class="lede" id="lede">A U-Net reads MRMS composite reflectivity and 0–2 km and 3–6 km merged AzShear every ~4 min and marks mid-level mesocyclone centers. A tracker links those into mesocyclone tracks and groups them into supercells. It was trained on 22 days of 2022 tracks, its tracker was tuned on 3 held-out 2022 days, and it was then run unchanged on the 5 days of 2023.</p>
+  </header>
+
+  <section class="col">
+    <h2>Scores</h2>
+    <div class="tablebox"><table id="summary"></table></div>
+    <p class="note">Pooled over days. A hand-made meso is <i>found</i> when a predicted meso is within 5 km of it in at least half of its frames. A predicted meso is a <i>false alarm</i> when it matches a hand-made meso in fewer than half of its frames and lies mostly inside the seven-state truth region (predicted tracks outside it are not scored). CSI = found / (hand-made + false).</p>
+  </section>
+
+  <section>
+    <div class="col" style="display:flex;flex-direction:column;gap:6px">
+      <h2>Predicted vs. hand-made tracks</h2>
+      <p class="note">Wide bands are the hand-made tracks; thin lines are the algorithm's. The shaded states are the truth region. Drag to pan, scroll or use the buttons to zoom, and hover a track for details. The time slider plays the day forward.</p>
+    </div>
+    <div class="bench">
+      <div class="mapbox" id="mapbox">
+        <svg id="map" viewBox="0 0 1000 680" role="img" aria-label="Map of predicted and hand-made mesocyclone tracks"></svg>
+        <div class="daytitle" id="daytitle"></div>
+        <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zreset" aria-label="Reset view" style="font-size:12px">⤢</button></div>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <aside class="side">
+        <div class="group"><span class="eyebrow">Day</span><div class="chips" id="days"></div></div>
+        <div class="group"><span class="eyebrow">Algorithm</span><div class="chips" id="runs"></div></div>
+        <div class="group"><span class="eyebrow">Show</span><div class="legend" id="legend"></div></div>
+        <div class="group"><span class="eyebrow">This day</span><div class="statline" id="daystats"></div></div>
+        <div class="group timebox"><span class="eyebrow">Time</span><input type="range" id="time" min="0" max="1000" value="1000" aria-label="Show tracks up to this time"><span class="tval" id="tval"></span></div>
+      </aside>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="col">Per-day scores</h2>
+    <div class="tablebox"><table id="perday"></table></div>
+    <p class="note">For the algorithm selected above. Click a row to map that day. Timing errors are for the predicted meso that matched each found meso most (minutes; positive = later than the hand-made track).</p>
+  </section>
+
+  <section class="col">
+    <h2>How it was built</h2>
+    <ul class="method" id="method"></ul>
+  </section>
+</div>
+
+<script>
+const D = /*DATA*/null;
+const $ = (id) => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const fmtPct = (v) => v == null ? "–" : Math.round(v * 100) + "%";
+const fmt2 = (v) => v == null ? "–" : v.toFixed(2);
+const fmt1 = (v) => v == null ? "–" : v.toFixed(1);
+const hhmm = (t) => { const d = new Date(t * 1000); return String(d.getUTCHours()).padStart(2, "0") + String(d.getUTCMinutes()).padStart(2, "0") + " UTC"; };
+const dayName = (d) => { const dt = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6))); return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }); };
+const shortDay = (d) => +d.slice(4, 6) + "/" + +d.slice(6) + "/" + d.slice(2, 4);
+
+const state = { day: (D.days.find(d => d.set === "test") || D.days[0]).day, run: D.runs[0].key, show: { found: true, missed: true, ok: true, false: true, outside: true }, frac: 1 };
+const runByKey = Object.fromEntries(D.runs.map(r => [r.key, r]));
+const dayByKey = Object.fromEntries(D.days.map(d => [d.day, d]));
+
+/* ---------- summary table ---------- */
+function summary() {
+  const rows = [["Mesos found (POD)", "meso_pod", fmtPct, 1], ["False meso tracks (FAR)", "meso_far", fmtPct, -1], ["Meso CSI", "meso_csi", fmt2, 1],
+                ["Supercells found (POD)", "sc_pod", fmtPct, 1], ["Supercell CSI", "sc_csi", fmt2, 1]];
+  let h = "<thead><tr><th></th>" + D.runs.map(r => `<th>${r.label}</th>`).join("") + "</tr></thead><tbody>";
+  for (const [setKey, setLabel] of [["test", "2023 test days (" + D.days.filter(d => d.set === "test").length + ")"], ["validation", "2022 held-out days (" + D.days.filter(d => d.set === "validation").length + "), used to tune the tracker"]]) {
+    h += `<tr class="sep"><td colspan="${D.runs.length + 1}">${setLabel}</td></tr>`;
+    for (const [lab, k, f, dir] of rows) {
+      const vals = D.runs.map(r => r.pooled[setKey]?.[k]);
+      const best = dir > 0 ? Math.max(...vals) : Math.min(...vals);
+      h += `<tr><td>${lab}</td>` + vals.map(v => `<td class="num${v === best ? " best" : ""}">${f(v)}</td>`).join("") + "</tr>";
+    }
+  }
+  $("summary").innerHTML = h + "</tbody>";
+}
+
+/* ---------- controls ---------- */
+function chips() {
+  const days = $("days"); days.innerHTML = "";
+  for (const set of ["test", "validation"]) {
+    for (const d of D.days.filter(x => x.set === set)) {
+      const b = document.createElement("button");
+      b.className = "chip"; b.textContent = shortDay(d.day); b.title = (set === "test" ? "2023 test day" : "2022 held-out day") + " · " + dayName(d.day);
+      b.setAttribute("aria-pressed", d.day === state.day); b.id = "day-" + d.day;
+      b.onclick = () => { state.day = d.day; state.frac = 1; $("time").value = 1000; resetView = true; render(); };
+      days.appendChild(b);
+    }
+    if (set === "test") { const s = document.createElement("span"); s.style.flexBasis = "100%"; s.style.height = "0"; days.appendChild(s); }
+  }
+  const runs = $("runs"); runs.innerHTML = "";
+  for (const r of D.runs) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = r.label; b.id = "run-" + r.key;
+    b.setAttribute("aria-pressed", r.key === state.run);
+    b.onclick = () => { state.run = r.key; render(); };
+    runs.appendChild(b);
+  }
+}
+
+const LAYERS = [
+  ["found", "Hand-made, found", "band", "--found"], ["missed", "Hand-made, missed", "band", "--missed"],
+  ["ok", "Predicted, matches", "line", "--ok"], ["false", "Predicted, false alarm", "line", "--false"],
+  ["outside", "Predicted, outside region", "dash", "--outside"]];
+
+function legend(counts) {
+  const L = $("legend"); L.innerHTML = "";
+  for (const [k, lab, kind, col] of LAYERS) {
+    const id = "show-" + k;
+    const lbl = document.createElement("label"); lbl.htmlFor = id;
+    const sw = `<svg class="swatch" viewBox="0 0 30 10" aria-hidden="true">${kind === "band" ? `<line x1="2" y1="5" x2="28" y2="5" stroke="var(${col})" stroke-width="7" stroke-linecap="round" opacity="0.5"/>` : `<line x1="2" y1="5" x2="28" y2="5" stroke="var(${col})" stroke-width="2" ${kind === "dash" ? 'stroke-dasharray="4 3"' : ""}/>`}</svg>`;
+    lbl.innerHTML = `<span style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="${id}" ${state.show[k] ? "checked" : ""}>${sw}</span><span>${lab}</span><span class="count">${counts[k]}</span>`;
+    L.appendChild(lbl);
+    lbl.querySelector("input").onchange = (e) => { state.show[k] = e.target.checked; draw(); };
+  }
+  L.style.gridTemplateColumns = "auto 1fr auto";
+}
+
+/* ---------- map ---------- */
+const svg = $("map");
+let view = null, base = null, resetView = true, proj = null;
+function setupProj(day) {
+  const run = runByKey[state.run];
+  const pts = day.truth.flatMap(t => t.pts);
+  for (const r of D.runs) for (const p of (r.days[day.day]?.pred || [])) if (p.status !== "outside") pts.push(...p.pts);
+  let la0 = Math.min(...pts.map(p => p[1])), la1 = Math.max(...pts.map(p => p[1]));
+  let lo0 = Math.min(...pts.map(p => p[2])), lo1 = Math.max(...pts.map(p => p[2]));
+  const c = Math.cos((la0 + la1) / 2 * Math.PI / 180);
+  const W = 1000, H = 680, pad = 40;
+  const sx = (lo1 - lo0) * c, sy = la1 - la0;
+  const k = Math.min((W - 2 * pad) / Math.max(sx, 0.5), (H - 2 * pad) / Math.max(sy, 0.5));
+  const ox = W / 2 - ((lo0 + lo1) / 2) * c * k, oy = H / 2 + ((la0 + la1) / 2) * k;
+  proj = (lat, lon) => [lon * c * k + ox, oy - lat * k];
+  base = [0, 0, W, H];
+}
+function pathD(pts) { return pts.map((p, i) => { const [x, y] = proj(p[1], p[2]); return (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1); }).join(""); }
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
+
+let tRange = [0, 1];
+function draw() {
+  const day = dayByKey[state.day];
+  const run = runByKey[state.run];
+  const preds = run.days[day.day]?.pred || [];
+  const all = day.truth.flatMap(t => t.pts).concat(preds.flatMap(p => p.pts));
+  tRange = [Math.min(...all.map(p => p[0])), Math.max(...all.map(p => p[0]))];
+  const tcut = tRange[0] + state.frac * (tRange[1] - tRange[0]);
+  $("tval").textContent = state.frac >= 1 ? "Whole day · " + hhmm(tRange[0]) + "–" + hhmm(tRange[1]) : "Up to " + hhmm(tcut);
+  svg.innerHTML = "";
+  const g0 = el("g", {}, svg);
+  for (const s of [...D.states].sort((a, b) => a.se - b.se)) for (const ring of s.rings) {
+    el("path", { d: ring.map((p, i) => { const [x, y] = proj(p[1], p[0]); return (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1); }).join("") + "Z",
+                 fill: s.se ? "var(--state-fill)" : "none", stroke: "var(--state)", "stroke-width": s.se ? 1.2 : 0.8, "vector-effect": "non-scaling-stroke" }, g0);
+  }
+  const cut = (pts) => state.frac >= 1 ? pts : pts.filter(p => p[0] <= tcut);
+  const gT = el("g", {}, svg), gP = el("g", {}, svg), gH = el("g", {}, svg);
+  for (const t of day.truth) {
+    const k = t.found[state.run] ? "found" : "missed";
+    if (!state.show[k]) continue;
+    const pts = cut(t.pts); if (!pts.length) continue;
+    const col = `var(--${k})`;
+    const p = el("path", { d: pathD(pts.length > 1 ? pts : [pts[0], pts[0]]), fill: "none", stroke: col, "stroke-width": 9, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.45, "vector-effect": "non-scaling-stroke" }, gT);
+    p.dataset.tip = `<b>Hand-made ${t.id}</b>${t.tornadic ? " · tornadic" : ""}<br>${hhmm(t.pts[0][0])}–${hhmm(t.pts[t.pts.length - 1][0])} · ${t.pts.length} scans<br>${t.scored ? (t.found[state.run] ? "Found" : "Missed") + " by " + run.label : "Not scored (no MRMS frame in its lifetime)"}`;
+    hover(p);
+    const last = pts[pts.length - 1];
+    if (state.frac < 1 && last[0] >= tcut - 600 && t.pts[t.pts.length - 1][0] > tcut) { const [x, y] = proj(last[1], last[2]); el("circle", { cx: x, cy: y, r: 5, fill: col, opacity: 0.7 }, gH); }
+  }
+  for (const pr of preds) {
+    if (!state.show[pr.status]) continue;
+    const pts = cut(pr.pts); if (!pts.length) continue;
+    const col = `var(--${pr.status})`;
+    const p = el("path", { d: pathD(pts.length > 1 ? pts : [pts[0], pts[0]]), fill: "none", stroke: col, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke", ...(pr.status === "outside" ? { "stroke-dasharray": "4 3" } : {}) }, gP);
+    const st = { ok: "Matches a hand-made meso", false: "False alarm", outside: "Outside the truth region (not scored)" }[pr.status];
+    p.dataset.tip = `<b>Predicted ${pr.id}</b> (supercell ${pr.sc})<br>${hhmm(pr.pts[0][0])}–${hhmm(pr.pts[pr.pts.length - 1][0])} · ${pr.pts.length} frames${pr.score != null ? " · peak score " + pr.score.toFixed(2) : ""}<br>${st}`;
+    hover(p);
+    const [x0, y0] = proj(pts[0][1], pts[0][2]);
+    el("circle", { cx: x0, cy: y0, r: 2.4, fill: col }, gP);
+    const last = pts[pts.length - 1];
+    if (state.frac < 1 && pr.pts[pr.pts.length - 1][0] > tcut && last[0] >= tcut - 600) { const [x, y] = proj(last[1], last[2]); el("circle", { cx: x, cy: y, r: 3.6, fill: col, stroke: "var(--panel)", "stroke-width": 1.2 }, gH); }
+  }
+  applyView();
+}
+
+function hover(p) {
+  p.style.pointerEvents = "stroke";
+  p.addEventListener("pointerenter", (e) => { const tip = $("tip"); tip.innerHTML = p.dataset.tip; tip.hidden = false; p.setAttribute("data-w", p.getAttribute("stroke-width")); p.setAttribute("stroke-width", +p.getAttribute("stroke-width") + 2); moveTip(e); });
+  p.addEventListener("pointermove", moveTip);
+  p.addEventListener("pointerleave", () => { $("tip").hidden = true; p.setAttribute("stroke-width", p.getAttribute("data-w")); });
+}
+function moveTip(e) {
+  const box = $("mapbox").getBoundingClientRect(), tip = $("tip");
+  let x = e.clientX - box.left + 14, y = e.clientY - box.top + 14;
+  if (x + tip.offsetWidth > box.width - 6) x = e.clientX - box.left - tip.offsetWidth - 14;
+  if (y + tip.offsetHeight > box.height - 6) y = e.clientY - box.top - tip.offsetHeight - 14;
+  tip.style.left = Math.max(6, x) + "px"; tip.style.top = Math.max(6, y) + "px";
+}
+
+function applyView() { svg.setAttribute("viewBox", view.map(v => v.toFixed(2)).join(" ")); }
+function zoomAt(f, cx, cy) {
+  const [x, y, w, h] = view;
+  const nw = Math.min(base[2] * 1.5, Math.max(base[2] / 40, w * f)), r = nw / w;
+  view = [cx - (cx - x) * r, cy - (cy - y) * r, nw, h * r];
+  applyView();
+}
+function svgPoint(e) { const r = svg.getBoundingClientRect(); return [view[0] + (e.clientX - r.left) / r.width * view[2], view[1] + (e.clientY - r.top) / r.height * view[3]]; }
+svg.addEventListener("wheel", (e) => { e.preventDefault(); const [cx, cy] = svgPoint(e); zoomAt(e.deltaY > 0 ? 1.2 : 1 / 1.2, cx, cy); }, { passive: false });
+let drag = null;
+svg.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, v: view.slice() }; svg.setPointerCapture(e.pointerId); svg.classList.add("dragging"); });
+svg.addEventListener("pointermove", (e) => { if (!drag) return; const r = svg.getBoundingClientRect(); view = [drag.v[0] - (e.clientX - drag.x) / r.width * drag.v[2], drag.v[1] - (e.clientY - drag.y) / r.height * drag.v[3], drag.v[2], drag.v[3]]; applyView(); });
+const endDrag = () => { drag = null; svg.classList.remove("dragging"); };
+svg.addEventListener("pointerup", endDrag); svg.addEventListener("pointercancel", endDrag);
+$("zin").onclick = () => zoomAt(1 / 1.5, view[0] + view[2] / 2, view[1] + view[3] / 2);
+$("zout").onclick = () => zoomAt(1.5, view[0] + view[2] / 2, view[1] + view[3] / 2);
+$("zreset").onclick = () => { view = base.slice(); applyView(); };
+$("time").oninput = (e) => { state.frac = +e.target.value / 1000; draw(); };
+
+/* ---------- per-day table ---------- */
+function perday() {
+  const run = runByKey[state.run];
+  const cols = [["Hand-made mesos", "truth_mesos", (v) => v], ["Found", "found_mesos", (v) => v], ["Predicted", "pred_mesos", (v) => v], ["False", "false_mesos", (v) => v],
+                ["POD", "meso_pod", fmtPct], ["Meso CSI", "meso_csi", fmt2], ["Supercells found", null, null], ["Supercell CSI", "sc_csi", fmt2],
+                ["Pieces per found meso", "frag_mean", fmt2], ["Start error (min)", "start_err_med_min", fmt1], ["End error (min)", "end_err_med_min", fmt1], ["Position error (km)", "pos_err_med_km", fmt1]];
+  let h = "<thead><tr><th>Day</th>" + cols.map(c => `<th>${c[0]}</th>`).join("") + "</tr></thead><tbody>";
+  for (const set of ["test", "validation"]) {
+    h += `<tr class="sep"><td colspan="${cols.length + 1}">${set === "test" ? "2023 test days" : "2022 held-out days"}</td></tr>`;
+    for (const d of D.days.filter(x => x.set === set)) {
+      const s = run.days[d.day]?.scores; if (!s) continue;
+      h += `<tr class="clickable${d.day === state.day ? " current" : ""}" data-day="${d.day}"><td>${dayName(d.day)}</td>` + cols.map(([_, k, f]) =>
+        k ? `<td class="num">${f(s[k])}</td>` : `<td class="num">${s.found_supercells}<span class="sub">of ${s.truth_supercells}</span></td>`).join("") + "</tr>";
+    }
+  }
+  $("perday").innerHTML = h + "</tbody>";
+  for (const tr of $("perday").querySelectorAll("tr[data-day]")) tr.onclick = () => { state.day = tr.dataset.day; state.frac = 1; $("time").value = 1000; resetView = true; render(); $("mapbox").scrollIntoView({ behavior: "smooth", block: "center" }); };
+}
+
+function render() {
+  const day = dayByKey[state.day], run = runByKey[state.run];
+  for (const b of $("days").querySelectorAll("button")) b.setAttribute("aria-pressed", b.id === "day-" + state.day);
+  for (const b of $("runs").querySelectorAll("button")) b.setAttribute("aria-pressed", b.id === "run-" + state.run);
+  if (resetView) { setupProj(day); view = base.slice(); resetView = false; }
+  const preds = run.days[day.day]?.pred || [];
+  const counts = { found: day.truth.filter(t => t.found[state.run]).length, missed: day.truth.filter(t => !t.found[state.run]).length,
+                   ok: preds.filter(p => p.status === "ok").length, false: preds.filter(p => p.status === "false").length, outside: preds.filter(p => p.status === "outside").length };
+  legend(counts);
+  const s = run.days[day.day].scores;
+  $("daystats").innerHTML = [["Mesos found", `${s.found_mesos}/${s.truth_mesos}`], ["Meso CSI", fmt2(s.meso_csi)], ["Supercells found", `${s.found_supercells}/${s.truth_supercells}`], ["False meso tracks", s.false_mesos]]
+    .map(([k, v]) => `<div class="stat"><span class="v">${v}</span><span class="k">${k}</span></div>`).join("");
+  $("daytitle").textContent = dayName(day.day) + " · " + (day.set === "test" ? "2023 test day" : "2022 held-out day") + " · " + run.label;
+  draw(); perday();
+}
+
+function method() {
+  const items = [
+    "Inputs every ~4 min on the 0.005° MRMS grid over the Southeast: 3–6 km and 0–2 km merged AzShear, composite reflectivity, the same three from the previous frame, and the height of the lowest radar beam.",
+    "Labels are the hand-made meso positions, shifted for the MRMS time offset: an MRMS grid valid at T shows a meso where the Level II track had it about " + Math.round(D.lag_s / 60) + " min earlier (" + D.lag_s + " s; measured on all 30 days). Predicted tracks here are shifted back to track time.",
+    "The model outputs a heat map of meso-center likelihood; peaks are the detections. The tracker links detections frame to frame (motion-predicted, 8 km gate, gaps up to two frames), starts tracks only on strong detections, and groups a new meso into an existing supercell when it forms within " + "15–25 km and 20 min of one of that supercell's mesos.",
+    "Tracker settings were chosen by grid search on the 2022 held-out days (best meso CSI) and applied unchanged to 2023: " + D.runs.map(r => `${r.label}: start ≥ ${r.settings.start_thr}, continue ≥ ${r.settings.cont_thr}, min ${r.settings.min_len} frames, join ${r.settings.join_km} km`).join("; ") + ".",
+    "The baseline uses the same tracker on 3–6 km AzShear peaks (3×3-mean ≥ 3 ×10⁻³ s⁻¹, with ≥ 35 dBZ nearby) instead of model detections.",
+    "Code: <code>ml/</code> in the supercell-site repository (README.md describes each stage)."];
+  $("method").innerHTML = items.map(i => `<li>${i}</li>`).join("");
+}
+
+summary(); chips(); method(); render();
+</script>
