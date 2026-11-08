@@ -151,7 +151,7 @@ def main() -> None:
     # validation on held-out days
     thresholds = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6]
     val = {}
-    if a.val_tars:
+    if a.val_tars and a.val_minutes > 0:
         days = [Day(extract(Path(t), Path("work-val"))) for t in a.val_tars]
         val = validate(model, days, beam, se, thresholds, log=log)
         best = max(val, key=lambda t: val[t]["csi"])
@@ -162,7 +162,7 @@ def main() -> None:
     meta = {"patches": n, "train_days": files, "epochs": epoch, "steps": step, "history": hist,
             "val_days": [Path(t).stem for t in a.val_tars],
             "val": {str(k): v for k, v in val.items()},
-            "best_threshold": max(val, key=lambda t: val[t]["csi"]) if val else 0.3,
+            "best_threshold": max(val, key=lambda t: val[t]["csi"]) if val else None,
             "minutes": round((time.time() - t_start) / 60, 1)}
     (out / "train_meta.json").write_text(json.dumps(meta, indent=1))
 

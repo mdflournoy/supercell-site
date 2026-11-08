@@ -11,7 +11,10 @@ on:
         default: "20220322 20220415 20220203"
       max_minutes:
         description: "Training + validation time budget (minutes)"
-        default: "300"
+        default: "320"
+      val_minutes:
+        description: "Minutes reserved for in-job validation (0 = skip; detection + tracking tune on the held-out days anyway)"
+        default: "0"
       tag:
         description: "Release tag for the trained model"
         default: "ml-model-v1"
@@ -73,9 +76,9 @@ jobs:
         run: for d in ${{ inputs.val_days }}; do gh release download ml-frames-v1 -R ${{ github.repository }} -p "$d.tar" -D tars; done
       - run: |
           python ml/train.py --patches patches --val-tars $(for d in ${{ inputs.val_days }}; do echo tars/$d.tar; done) \
-            --out model --max-minutes ${{ inputs.max_minutes }} --threads 4
+            --out model --max-minutes ${{ inputs.max_minutes }} --val-minutes ${{ inputs.val_minutes }} --threads 4
       - name: Store the model
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}   # also after a timeout: mesonet.pt is saved after every epoch
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           gh release view ${{ inputs.tag }} >/dev/null 2>&1 || gh release create ${{ inputs.tag }} --prerelease \
