@@ -5,14 +5,19 @@ Reads the renumbered day files in tracks/ (not modified) and writes one file per
 tracks-AzShear/YYYYMMDD.csv with a row for every mesocyclone at every MRMS time (~2 min)
 within its tracked lifetime (first to last scan):
 
-  supercell_id, meso_id, time_utc   MRMS valid time (0-2 km product)
-  lat, lon                          meso position linearly interpolated to that time
-  azshear_0_2km, azshear_3_6km      peak MergedAzShear (10^-3 s^-1) within RADIUS_KM of the
-                                    interpolated position (blank = no valid MRMS data)
+  supercell_id, meso_id, time_utc   track time = MRMS valid time (0-2 km product) - MRMS_LAG_S
+  lat, lon                          meso position linearly interpolated to time_utc
+  azshear_0_2km, azshear_3_6km      peak MergedAzShear (10^-3 s^-1) within RADIUS_KM of that
+                                    position (blank = no valid MRMS data)
+  mrms_time_utc                     the MRMS valid time the 0-2 km value comes from
 
-The 3-6 km value uses the 3-6 km file nearest in time (within 90 s), with the position
-interpolated to that file's own time. A meso tracked on a single scan gets the one MRMS
-time nearest to it (within 5 min).
+MRMS lags the Level II track times: a merged AzShear grid valid at T shows a meso where the
+track puts it about 6 min earlier (MRMS_LAG_S; measured on all 30 event days in
+ml/diagnostics, pooled peak at -6 min for 3-6 km and -5 min for 0-2 km). So each MRMS grid
+is sampled at the track position MRMS_LAG_S before its valid time, and the row is reported at
+that track time. The 3-6 km value uses the 3-6 km file nearest in time (within 90 s), with
+the position taken the same way from that file's own time. A meso tracked on a single scan
+gets the one MRMS time nearest to it (within 5 min, after the shift).
 
 Each MRMS file is downloaded once: results are cached in azshear-cache/cache.csv. A run
 stops starting new downloads after --max-minutes; the rest is filled on the next run.
@@ -48,6 +53,7 @@ PRODUCTS = {
     "azshear_3_6km": "MergedAzShear_3-6kmAGL_00.50",
 }
 RADIUS_KM = 2.0
+MRMS_LAG_S = 350.0   # MRMS valid time minus the matching Level II track time (s)
 MAX_DT = timedelta(minutes=5)
 KEY_RE = re.compile(r"_(\d{8})-(\d{6})\.grib2\.gz$")
 S3NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
@@ -301,18 +307,22 @@ def main() -> None:
         lo_times, lo_secs, _ = avail[lo_col]
         for (sc, ms), (ts, la, lo) in tr.items():
             if len(ts) > 1 and ts[-1] > ts[0]:
-                k0, k1 = bisect.bisect_left(lo_secs, ts[0]), bisect.bisect_right(lo_secs, ts[-1])
+                k0 = bisect.bisect_left(lo_secs, ts[0] + MRMS_LAG_S)
+                k1 = bisect.bisect_right(lo_secs, ts[-1] + MRMS_LAG_S)
                 whens = lo_times[k0:k1]
             else:
-                w1 = nearest(lo_col, float(ts[0]), MAX_DT)
+                w1 = nearest(lo_col, float(ts[0]) + MRMS_LAG_S, MAX_DT)
                 whens = [w1] if w1 else []
             for when in whens:
-                plat, plon = interp_track(ts, la, lo, when.timestamp())
-                row = {"supercell_id": sc, "meso_id": ms, "time_utc": when.strftime("%Y-%m-%dT%H:%M:%S+00:00"),
-                       "lat": round(plat, 5), "lon": round(plon, 5), lo_col: need(lo_col, when, plat, plon), mid_col: None}
+                tt = when.timestamp() - MRMS_LAG_S
+                plat, plon = interp_track(ts, la, lo, tt)
+                row = {"supercell_id": sc, "meso_id": ms,
+                       "time_utc": datetime.fromtimestamp(tt, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00"),
+                       "lat": round(plat, 5), "lon": round(plon, 5), lo_col: need(lo_col, when, plat, plon), mid_col: None,
+                       "mrms_time_utc": when.strftime("%Y-%m-%dT%H:%M:%S+00:00")}
                 w2 = nearest(mid_col, when.timestamp(), MATCH_3_6)
                 if w2:
-                    mlat, mlon = interp_track(ts, la, lo, w2.timestamp())
+                    mlat, mlon = interp_track(ts, la, lo, w2.timestamp() - MRMS_LAG_S)
                     row[mid_col] = need(mid_col, w2, mlat, mlon)
                 rows.append(row)
         series[p] = rows
@@ -360,13 +370,16 @@ def main() -> None:
     for old in out_dir.glob("*.csv"):
         old.unlink()
     filled = blank = pending_vals = 0
-    cols = ["supercell_id", "meso_id", "time_utc", "lat", "lon", lo_col, mid_col]
+    cols = ["supercell_id", "meso_id", "time_utc", "lat", "lon", lo_col, mid_col, "mrms_time_utc"]
+    used = set()
     for p, rows in series.items():
         out_rows = []
         for r in rows:
             r = dict(r)
             for col in (lo_col, mid_col):
                 ck = r[col]
+                if ck is not None:
+                    used.add(ck)
                 if ck is None:
                     r[col] = ""
                     blank += 1
@@ -384,6 +397,7 @@ def main() -> None:
                                 key=lambda c: c.map(lambda v: (len(v), v)) if c.name == "supercell_id" else (c.astype(int) if c.name == "meso_id" else c))
         df.to_csv(out_dir / p.name, index=False, lineterminator="\n")
 
+    cache = {k: v for k, v in cache.items() if k in used}   # drop values no series uses any more
     pd.DataFrame(sorted(cache.items()), columns=["key", "value"]).to_csv(a.cache, index=False, lineterminator="\n")
     status.update({
         "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),
