@@ -42,12 +42,12 @@ def run(det, times, p: Params):
 
 def grid(method: str):
     if method == "model":
-        starts, conts, lens = [0.2, 0.3, 0.4, 0.5, 0.6], [0.1, 0.15, 0.2, 0.3, 0.4], [2, 3, 4, 6]
+        starts, conts, lens = [0.15, 0.2, 0.3, 0.4, 0.5], [0.05, 0.075, 0.1, 0.15, 0.2, 0.3], [3, 6, 8, 10, 12, 15, 20]
     else:
         starts, conts, lens = [6, 8, 10, 12, 15], [3, 4, 5, 6, 8], [3, 5, 8]
     # reflectivity gates (model only; the baseline already requires >= 35 dBZ within 5 km)
     dbz = [(-99.0, -99.0)] if method != "model" or not REFL else \
-        [(d, t) for d in (-99.0, 30.0, 35.0, 40.0) for t in (-99.0, 40.0, 45.0, 50.0)]
+        [(-99.0, t) for t in (-99.0, 50.0, 52.0, 55.0)]  # detection-level gates (30-40 dBZ) never removed anything
     for s, c, ml, jk, (dm, td) in itertools.product(starts, conts, lens, [15.0, 25.0], dbz):
         if c <= s:
             yield Params(start_thr=s, cont_thr=c, min_len=ml, join_km=jk, dbz_min=dm, trk_dbz=td)
