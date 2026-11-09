@@ -1,0 +1,48 @@
+name: ML - single-site training patches
+
+# Single-site stage 3 (ml/l2_patches.py): Level II volumes -> dealiased (MIT LL U-Net VDA) height-layer
+# fields on a radar-centered grid -> training patches, one release asset per day.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days (default: all 2022 days except the 3 held-out days)"
+        default: "20220101 20220108 20220216 20220217 20220221 20220306 20220308 20220309 20220315 20220316 20220405 20220406 20220413 20220430 20220501 20220502 20220503 20220504 20220512 20220513 20220514 20220525 20220526 20220903 20220907"
+      tag:
+        default: "ml-l2-patches-v1"
+      max_volumes:
+        description: "Volumes per day (random subset; ~5 patches each)"
+        default: "120"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      days: ${{ steps.p.outputs.days }}
+    steps:
+      - id: p
+        run: echo "days=$(printf '%s\n' ${{ inputs.days }} | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release view ${{ inputs.tag }} -R ${{ github.repository }} >/dev/null 2>&1 || gh release create ${{ inputs.tag }} -R ${{ github.repository }} --prerelease --title "ML single-site patches" --notes "Level II training patches (ml/l2_patches.py)"
+
+  patches:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        day: ${{ fromJson(needs.plan.outputs.days) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib requests arm_pyart tensorflow-cpu tf_keras
+      - run: git clone --depth 1 https://github.com/mit-ll/unet-vda.git ml/unet-vda
+      - run: python ml/l2_patches.py --day ${{ matrix.day }} --out patches --workers 4 --max-volumes ${{ inputs.max_volumes }}
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release upload ${{ inputs.tag }} -R ${{ github.repository }} patches/l2patches_${{ matrix.day }}.npz --clobber

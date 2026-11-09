@@ -57,9 +57,29 @@ def sites() -> pd.DataFrame:
 
 def list_volumes(site: str, day: datetime) -> np.ndarray:
     """Volume start times (epoch s) of one radar on one UTC day."""
+    return np.unique(list(list_keys(site, day)))
+
+
+_BAD_BUCKETS: set = set()
+_GOOD_BUCKETS: set = set()
+
+
+def list_keys(site: str, day: datetime) -> dict:
+    """{volume start time (epoch s): download URL} of one radar on one UTC day."""
     prefix = f"{day:%Y/%m/%d}/{site}/"
     for bucket in BUCKETS:
-        out, token = [], None
+        if bucket in _BAD_BUCKETS:
+            continue
+        if bucket not in _GOOD_BUCKETS:
+            try:
+                requests.get(bucket + "/", params={"list-type": "2", "max-keys": "1", "prefix": "2022/"},
+                             timeout=30).raise_for_status()
+                _GOOD_BUCKETS.add(bucket)
+            except Exception as e:  # noqa: BLE001
+                print("bucket unavailable:", bucket, e, flush=True)
+                _BAD_BUCKETS.add(bucket)
+                continue
+        out, token = {}, None
         try:
             while True:
                 params = {"list-type": "2", "prefix": prefix, "max-keys": "1000"}
@@ -73,7 +93,7 @@ def list_volumes(site: str, day: datetime) -> np.ndarray:
                     m = KEY_RE.search(k)
                     if m:
                         t = datetime.strptime(m.group(2) + m.group(3), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-                        out.append(t.timestamp())
+                        out[t.timestamp()] = f"{bucket}/{k}"
                 if root.findtext(S3NS + "IsTruncated") == "true":
                     token = root.findtext(S3NS + "NextContinuationToken")
                 else:
@@ -82,8 +102,8 @@ def list_volumes(site: str, day: datetime) -> np.ndarray:
             print("list failed", bucket, prefix, e)
             continue
         if out:
-            return np.unique(out)
-    return np.array([])
+            return out
+    return {}
 
 
 def km(lat0, lon0, lat1, lon1):
@@ -105,10 +125,13 @@ def main() -> None:
         cand = np.where(d.min(axis=0) < NEAR_KM)[0]
         days = sorted({datetime.fromtimestamp(t, timezone.utc).date() for t in (g.t.min() - 600, g.t.max() + 600)})
         days = [days[0] + timedelta(n) for n in range((days[-1] - days[0]).days + 1)]
-        vols = {}
-        for j in cand:
-            v = np.concatenate([list_volumes(st.site.iloc[j], datetime.combine(dd, datetime.min.time())) for dd in days])
-            vols[j] = np.sort(v)
+        from concurrent.futures import ThreadPoolExecutor
+
+        def one(j):
+            return j, np.sort(np.concatenate([list_volumes(st.site.iloc[j], datetime.combine(dd, datetime.min.time()))
+                                              for dd in days]))
+        with ThreadPoolExecutor(16) as ex:
+            vols = dict(ex.map(one, cand))
         print(f, len(g), "points;", len(cand), "radars;", sum(len(v) for v in vols.values()), "volumes", flush=True)
         order = np.argsort(d, axis=1)
         for i, (_, r) in enumerate(g.iterrows()):
