@@ -69,6 +69,8 @@ def main() -> None:
     ap.add_argument("--det", required=True)
     ap.add_argument("--refl", action="store_true", help="also tune reflectivity gates (needs dbz5 in detections)")
     ap.add_argument("--out", default=str(ML_DIR / "results"))
+    ap.add_argument("--methods", nargs="+", default=["model", "baseline"])
+    ap.add_argument("--lag", type=float, default=MRMS_LAG_S, help="frame time minus track time (0 for Level II)")
     ap.add_argument("--frames", help="folder of extracted day folders (ml/frames.extract); enables the backward "
                                      "reflectivity-cell extension of model supercells (ml/backtrack.py)")
     a = ap.parse_args()
@@ -82,7 +84,7 @@ def main() -> None:
     data = {d: load(det_dir, d) for d in days}
 
     tuning, chosen = [], {}
-    for method in ("model", "baseline"):
+    for method in a.methods:
         best = None
         for p in grid(method):
             rows = []
@@ -120,7 +122,7 @@ def main() -> None:
             pred = run(det[det.method == method], times, p)
             if back and method == "model":
                 pred = extend(pred, refs[d], back)
-            (out / "pred_tracks" / method / f"{d}.csv").write_text(to_tracks_csv(pred, MRMS_LAG_S) if len(pred) else "")
+            (out / "pred_tracks" / method / f"{d}.csv").write_text(to_tracks_csv(pred, a.lag) if len(pred) else "")
             r = score_day(pred, lab)
             scores.append({"day": d, "set": "test" if d in test else "validation", "method": method, **r})
     sc = pd.DataFrame(scores)

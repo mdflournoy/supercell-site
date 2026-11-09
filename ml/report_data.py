@@ -36,6 +36,7 @@ def main() -> None:
     ap.add_argument("--det", required=True)
     ap.add_argument("--results", required=True)
     ap.add_argument("--label", default="")
+    ap.add_argument("--lag", type=float, default=MRMS_LAG_S, help="frame time minus track time (0 for Level II)")
     ap.add_argument("--frames", help="extracted day folders; needed when summary.json has a backward extension")
     a = ap.parse_args()
     det_dir, res_dir = Path(a.det), Path(a.results)
@@ -67,7 +68,7 @@ def main() -> None:
                     pm.append({"id": k, "sc": g.supercell_id.iloc[0], "status": pst.get(k, "outside"),
                                "score": round(float(g.score.max()), 3),
                                "nback": int((g.stage == "back").sum()) if "stage" in g else 0,
-                               "pts": [[int(t - MRMS_LAG_S), round(la, 4), round(lo, 4)] for t, la, lo in zip(g.t, g.lat, g.lon)]})
+                               "pts": [[int(t - a.lag), round(la, 4), round(lo, 4)] for t, la, lo in zip(g.t, g.lat, g.lon)]})
             entry["pred"][m] = pm
         tm = []
         for (sc, ms), g in tr.groupby(["supercell", "meso"], sort=False):
@@ -92,7 +93,7 @@ def main() -> None:
         polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
         states.append({"name": f["properties"].get("name", ""), "se": f["properties"].get("name") in se_names,
                        "rings": [[[round(x, 3), round(y, 3)] for x, y in ring] for poly in polys for ring in poly]})
-    rep = {"label": a.label, "lag_s": MRMS_LAG_S, "settings": summ["settings"], "back": summ.get("back"), "pooled": pooled_out,
+    rep = {"label": a.label, "lag_s": a.lag, "settings": summ["settings"], "back": summ.get("back"), "pooled": pooled_out,
            "days": out_days, "states": states}
     (res_dir / "report.json").write_text(json.dumps(rep, separators=(",", ":")))
     print(json.dumps(pooled_out, indent=1))
