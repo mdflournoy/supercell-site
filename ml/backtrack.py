@@ -44,7 +44,8 @@ class BackParams:
 class RefFrames:
     """Composite reflectivity (dBZ) by frame time for one extracted day folder (ml/frames.extract)."""
 
-    def __init__(self, day_dir: Path):
+    def __init__(self, day_dir: Path, tol: float = 90.0):
+        self.tol = tol                                 # max |frame time - query time| (s)
         fr = pd.read_csv(day_dir / "frames.csv").sort_values("t")
         self.dir = Path(day_dir)
         self.t = fr.t.to_numpy(dtype=float)
@@ -60,7 +61,7 @@ class RefFrames:
 
     def index(self, t: float) -> int:
         i = int(np.argmin(np.abs(self.t - t)))
-        return i if abs(self.t[i] - t) < 90 else -1
+        return i if abs(self.t[i] - t) < self.tol else -1
 
 
 def rc(lat: float, lon: float) -> tuple[float, float]:

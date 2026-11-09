@@ -37,6 +37,7 @@ def main() -> None:
     ap.add_argument("--results", required=True)
     ap.add_argument("--label", default="")
     ap.add_argument("--lag", type=float, default=MRMS_LAG_S, help="frame time minus track time (0 for Level II)")
+    ap.add_argument("--frame-tol", type=float, default=90.0, help="reflectivity frame time tolerance (s); 160 for Level II steps")
     ap.add_argument("--frames", help="extracted day folders; needed when summary.json has a backward extension")
     a = ap.parse_args()
     det_dir, res_dir = Path(a.det), Path(a.results)
@@ -56,7 +57,7 @@ def main() -> None:
         for m, p in settings.items():
             pred = run(det[det.method == m], times, p)
             if back and m == "model":
-                pred = extend(pred, RefFrames(Path(a.frames) / d), back)
+                pred = extend(pred, RefFrames(Path(a.frames) / d, a.frame_tol), back)
             r, found, pst, main_of = score_day(pred, lab, status=True)
             entry["scores"][m] = {k: clean(v) for k, v in r.items()}
             found_any[m] = found

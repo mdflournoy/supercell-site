@@ -71,6 +71,7 @@ def main() -> None:
     ap.add_argument("--out", default=str(ML_DIR / "results"))
     ap.add_argument("--methods", nargs="+", default=["model", "baseline"])
     ap.add_argument("--lag", type=float, default=MRMS_LAG_S, help="frame time minus track time (0 for Level II)")
+    ap.add_argument("--frame-tol", type=float, default=90.0, help="reflectivity frame time tolerance (s); 160 for Level II steps")
     ap.add_argument("--frames", help="folder of extracted day folders (ml/frames.extract); enables the backward "
                                      "reflectivity-cell extension of model supercells (ml/backtrack.py)")
     a = ap.parse_args()
@@ -100,7 +101,7 @@ def main() -> None:
         print(method, best[0], {k: round(v, 3) for k, v in best[1].items()})
     back = None
     if a.frames:
-        refs = {d: RefFrames(Path(a.frames) / d) for d in days}
+        refs = {d: RefFrames(Path(a.frames) / d, a.frame_tol) for d in days}
         p = chosen["model"]
         base_pred = {d: run(data[d][0][data[d][0].method == "model"], data[d][1], p) for d in VAL}
         best = None
