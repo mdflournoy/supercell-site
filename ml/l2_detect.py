@@ -10,8 +10,8 @@ mid-level beams overshoot there). A radar's detections are kept only inside its 
   python ml/l2_detect.py run --day D --radars KDGX KJAN --model mesonet_l2.pt --out det/
   python ml/l2_detect.py merge --day D --in det/ --out detdir/  -> {day}_detections/frames/labels for run_tracking
 
-Volumes with no echo >= SKIP_DBZ (lowest sweep) inside the radar's area are skipped without
-dealiasing. Merging bins the asynchronous radars into STEP_S time steps: for each step, each radar
+Only volumes within 3 min of an MRMS frame with >= 50 dBZ composite reflectivity in the radar's area
+(ml/l2/active.json) are processed. Merging bins the asynchronous radars into STEP_S time steps: for each step, each radar
 contributes its volume nearest the step (within STEP_S / 2), so the tracker sees one frame per step.
 """
 from __future__ import annotations
@@ -79,16 +79,21 @@ def region_mask(lat, lon):
     return m[i, j].reshape(np.shape(lat))
 
 
-def plan(days):
-    st = sites()
-    g = np.mgrid[28:40.6:0.05, -97.5:-77.4:0.05].reshape(2, -1).T
-    keep = region_mask(g[:, 0], g[:, 1])
-    idx = np.unique(responsible(g[keep, 0], g[keep, 1], st))
-    radars = sorted(st.site.iloc[idx])
-    jobs = [{"day": d, "radars": " ".join(radars[i:i + RADARS_PER_JOB])}
-            for d in days for i in range(0, len(radars), RADARS_PER_JOB)]
+def plan(days, per_job: int = 160):
+    """Jobs of about per_job active radar-frames each (ml/l2/active.json: frames with >= 50 dBZ MRMS
+    composite reflectivity in a radar's area), so jobs take similar time."""
+    act = json.loads((ML_DIR / "l2" / "active.json").read_text())
+    jobs = []
+    for d in days:
+        cur, n = [], 0
+        for site, ts in sorted(act.get(d, {}).items(), key=lambda kv: -len(kv[1])):
+            cur.append(site); n += len(ts)
+            if n >= per_job:
+                jobs.append({"day": d, "radars": " ".join(cur)}); cur, n = [], 0
+        if cur:
+            jobs.append({"day": d, "radars": " ".join(cur)})
     print(json.dumps(jobs))
-    print(len(radars), "radars:", " ".join(radars), file=sys.stderr)
+    print(len(jobs), "jobs", file=sys.stderr)
 
 
 _MODEL = None
@@ -152,8 +157,6 @@ def work(job):
                     return site, t, None, "download failed"
                 time.sleep(5)
         try:
-            if quick_echo(f, site) < SKIP_DBZ:
-                return site, t, [], "skip"
             x, meta = L.process(f)
         except Exception as e:  # noqa: BLE001
             return site, t, None, f"process failed: {e}"
@@ -184,7 +187,8 @@ def run(a):
         while d <= datetime.fromtimestamp(t1, timezone.utc).date():
             keys.update(list_keys(site, datetime.combine(d, datetime.min.time())))
             d += timedelta(1)
-        sel = sorted(t for t in keys if t0 <= t <= t1)
+        act = np.array(json.loads((ML_DIR / "l2" / "active.json").read_text()).get(a.day, {}).get(site, []))
+        sel = sorted(t for t in keys if t0 <= t <= t1 and len(act) and np.min(np.abs(act - t)) <= 180)
         jobs += [(keys[t], float(t), site, a.model) for t in sel]
         print(site, len(sel), "volumes", flush=True)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)

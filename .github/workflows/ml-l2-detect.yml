@@ -1,0 +1,67 @@
+name: ML - single-site detection
+
+# Single-site stage 5 (ml/l2_detect.py): run the Level II model over every radar covering the
+# Southeast on the held-out and test days; merge radars into tracker inputs.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        default: "20220203 20220322 20220415 20230323 20230324 20230325 20230331 20230614"
+      model_tag:
+        default: "ml-l2-model-v1"
+      tag:
+        default: "ml-l2-detections-v1"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.p.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib
+      - id: p
+        run: echo "jobs=$(python ml/l2_detect.py plan ${{ inputs.days }})" >> "$GITHUB_OUTPUT"
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release view ${{ inputs.tag }} -R ${{ github.repository }} >/dev/null 2>&1 || gh release create ${{ inputs.tag }} -R ${{ github.repository }} --prerelease --title "ML single-site detections" --notes "Per-radar Level II detections (ml/l2_detect.py)"
+
+  detect:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.jobs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib requests arm_pyart tensorflow-cpu tf_keras && pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: git clone --depth 1 https://github.com/mit-ll/unet-vda.git ml/unet-vda
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release download ${{ inputs.model_tag }} -R ${{ github.repository }} -p mesonet_l2.pt -D model
+      - run: python ml/l2_detect.py run --day ${{ matrix.day }} --radars ${{ matrix.radars }} --model model/mesonet_l2.pt --out det --workers 4
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release upload ${{ inputs.tag }} -R ${{ github.repository }} det/* --clobber
+
+  merge:
+    needs: detect
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install numpy pandas matplotlib
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release download ${{ inputs.tag }} -R ${{ github.repository }} -p "l2det_*" -p "l2vols_*" -D det
+          for d in ${{ inputs.days }}; do python ml/l2_detect.py merge --day $d --in det --out merged; done
+          gh release upload ${{ inputs.tag }} -R ${{ github.repository }} merged/* --clobber
