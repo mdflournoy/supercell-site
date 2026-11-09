@@ -19,6 +19,7 @@ import pandas as pd
 from common import ML_DIR, MRMS_LAG_S, read_tracks
 from run_tracking import load, pooled, run
 from score_tracks import score_day
+from backtrack import BackParams, RefFrames, extend
 from track import Params
 
 
@@ -35,10 +36,14 @@ def main() -> None:
     ap.add_argument("--det", required=True)
     ap.add_argument("--results", required=True)
     ap.add_argument("--label", default="")
+    ap.add_argument("--frames", help="extracted day folders; needed when summary.json has a backward extension")
     a = ap.parse_args()
     det_dir, res_dir = Path(a.det), Path(a.results)
     summ = json.loads((res_dir / "summary.json").read_text())
     settings = {m: Params(**v) for m, v in summ["settings"].items()}
+    back = BackParams(**summ["back"]) if summ.get("back") else None
+    if back and not a.frames:
+        raise SystemExit("summary.json uses the backward extension: pass --frames")
     tracks = read_tracks()
     days = sorted(p.name[:8] for p in det_dir.glob("*_detections.csv.gz"))
     out_days = []
@@ -49,6 +54,8 @@ def main() -> None:
         found_any = {}
         for m, p in settings.items():
             pred = run(det[det.method == m], times, p)
+            if back and m == "model":
+                pred = extend(pred, RefFrames(Path(a.frames) / d), back)
             r, found, pst, main_of = score_day(pred, lab, status=True)
             entry["scores"][m] = {k: clean(v) for k, v in r.items()}
             found_any[m] = found
@@ -59,6 +66,7 @@ def main() -> None:
                     g = g.sort_values("t")
                     pm.append({"id": k, "sc": g.supercell_id.iloc[0], "status": pst.get(k, "outside"),
                                "score": round(float(g.score.max()), 3),
+                               "nback": int((g.stage == "back").sum()) if "stage" in g else 0,
                                "pts": [[int(t - MRMS_LAG_S), round(la, 4), round(lo, 4)] for t, la, lo in zip(g.t, g.lat, g.lon)]})
             entry["pred"][m] = pm
         tm = []
@@ -84,7 +92,7 @@ def main() -> None:
         polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
         states.append({"name": f["properties"].get("name", ""), "se": f["properties"].get("name") in se_names,
                        "rings": [[[round(x, 3), round(y, 3)] for x, y in ring] for poly in polys for ring in poly]})
-    rep = {"label": a.label, "lag_s": MRMS_LAG_S, "settings": summ["settings"], "pooled": pooled_out,
+    rep = {"label": a.label, "lag_s": MRMS_LAG_S, "settings": summ["settings"], "back": summ.get("back"), "pooled": pooled_out,
            "days": out_days, "states": states}
     (res_dir / "report.json").write_text(json.dumps(rep, separators=(",", ":")))
     print(json.dumps(pooled_out, indent=1))

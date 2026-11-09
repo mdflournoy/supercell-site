@@ -22,6 +22,7 @@ import pandas as pd
 
 from common import ML_DIR, MRMS_LAG_S
 from score_tracks import score_day
+from backtrack import BackParams, RefFrames, extend
 from track import Params, group, link, to_tracks_csv
 
 VAL = ["20220322", "20220415", "20220203"]
@@ -68,6 +69,8 @@ def main() -> None:
     ap.add_argument("--det", required=True)
     ap.add_argument("--refl", action="store_true", help="also tune reflectivity gates (needs dbz5 in detections)")
     ap.add_argument("--out", default=str(ML_DIR / "results"))
+    ap.add_argument("--frames", help="folder of extracted day folders (ml/frames.extract); enables the backward "
+                                     "reflectivity-cell extension of model supercells (ml/backtrack.py)")
     a = ap.parse_args()
     global REFL
     REFL = a.refl
@@ -93,6 +96,20 @@ def main() -> None:
                 best = (p, r)
         chosen[method] = best[0]
         print(method, best[0], {k: round(v, 3) for k, v in best[1].items()})
+    back = None
+    if a.frames:
+        refs = {d: RefFrames(Path(a.frames) / d) for d in days}
+        p = chosen["model"]
+        base_pred = {d: run(data[d][0][data[d][0].method == "model"], data[d][1], p) for d in VAL}
+        best = None
+        for sd in (35.0, 40.0, 45.0, 50.0, 55.0):
+            bp = BackParams(stop_dbz=sd)
+            r = pooled([score_day(extend(base_pred[d], refs[d], bp), data[d][2]) for d in VAL])
+            tuning.append({"method": "model+back", **p.__dict__, "back_stop_dbz": sd, **r})
+            if best is None or r["meso_csi"] > best[1]["meso_csi"]:
+                best = (bp, r)
+        back = best[0]
+        print("backward extension", back, {k: round(v, 3) for k, v in best[1].items()})
     pd.DataFrame(tuning).to_csv(out / "tuning.csv", index=False)
 
     scores = []
@@ -101,12 +118,15 @@ def main() -> None:
         for d in days:
             det, times, lab = data[d]
             pred = run(det[det.method == method], times, p)
+            if back and method == "model":
+                pred = extend(pred, refs[d], back)
             (out / "pred_tracks" / method / f"{d}.csv").write_text(to_tracks_csv(pred, MRMS_LAG_S) if len(pred) else "")
             r = score_day(pred, lab)
             scores.append({"day": d, "set": "test" if d in test else "validation", "method": method, **r})
     sc = pd.DataFrame(scores)
     sc.to_csv(out / "scores.csv", index=False)
     summ = {"settings": {m: p.__dict__ for m, p in chosen.items()},
+            "back": back.__dict__ if back else None,
             "test": {m: pooled(sc[(sc.set == "test") & (sc.method == m)].to_dict("records")) for m in chosen},
             "validation": {m: pooled(sc[(sc.set == "validation") & (sc.method == m)].to_dict("records")) for m in chosen}}
     (out / "summary.json").write_text(json.dumps(summ, indent=1))

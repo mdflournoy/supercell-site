@@ -28,6 +28,7 @@ def main() -> None:
             methods.append(("baseline", "baseline", "AzShear threshold"))
         for m, rk, label in methods:
             runs.append({"key": rk, "label": label, "settings": r["settings"][m],
+                         "back": r.get("back") if m == "model" else None,
                          "pooled": {s: r["pooled"][s][m] for s in r["pooled"]},
                          "days": {e["day"]: {"scores": e["scores"][m], "pred": e["pred"][m]} for e in r["days"]}})
         for e in r["days"]:

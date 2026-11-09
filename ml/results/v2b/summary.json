@@ -1,0 +1,66 @@
+{
+ "settings": {
+  "model": {
+   "start_thr": 0.2,
+   "cont_thr": 0.075,
+   "gate_km": 8.0,
+   "max_gap": 2,
+   "min_len": 20,
+   "join_km": 15.0,
+   "join_min": 20.0,
+   "dbz_min": -99.0,
+   "trk_dbz": -99.0
+  },
+  "baseline": {
+   "start_thr": 12,
+   "cont_thr": 5,
+   "gate_km": 8.0,
+   "max_gap": 2,
+   "min_len": 8,
+   "join_km": 15.0,
+   "join_min": 20.0,
+   "dbz_min": -99.0,
+   "trk_dbz": -99.0
+  }
+ },
+ "back": {
+  "stop_dbz": 50.0,
+  "min_corr": 0.4,
+  "max_steps": 45,
+  "half_km": 15.0,
+  "search_km": 8.0,
+  "floor": 20.0
+ },
+ "test": {
+  "model": {
+   "meso_pod": 0.436046511627907,
+   "meso_far": 0.5769230769230769,
+   "meso_csi": 0.3232758620689655,
+   "sc_pod": 0.5180722891566265,
+   "sc_csi": 0.3115942028985507
+  },
+  "baseline": {
+   "meso_pod": 0.0755813953488372,
+   "meso_far": 0.8736842105263158,
+   "meso_csi": 0.038461538461538464,
+   "sc_pod": 0.12048192771084337,
+   "sc_csi": 0.06944444444444445
+  }
+ },
+ "validation": {
+  "model": {
+   "meso_pod": 0.6176470588235294,
+   "meso_far": 0.47368421052631576,
+   "meso_csi": 0.4883720930232558,
+   "sc_pod": 0.7428571428571429,
+   "sc_csi": 0.49056603773584906
+  },
+  "baseline": {
+   "meso_pod": 0.16176470588235295,
+   "meso_far": 0.9024390243902439,
+   "meso_csi": 0.07746478873239436,
+   "sc_pod": 0.17142857142857143,
+   "sc_csi": 0.08823529411764706
+  }
+ }
+}

@@ -104,7 +104,7 @@ code { font-family: var(--f-mono); font-size: 0.92em; background: var(--soft); p
   <section>
     <div class="col" style="display:flex;flex-direction:column;gap:6px">
       <h2>Predicted vs. hand-made tracks</h2>
-      <p class="note">Wide bands are the hand-made tracks; thin lines are the algorithm's. The shaded states are the truth region. Drag to pan, scroll or use the buttons to zoom, and hover a track for details. The time slider plays the day forward.</p>
+      <p class="note">Wide bands are the hand-made tracks; thin lines are the algorithm's, dotted where a supercell was traced back in time along its reflectivity cell. The shaded states are the truth region. Drag to pan, scroll or use the buttons to zoom, and hover a track for details. The time slider plays the day forward.</p>
     </div>
     <div class="bench">
       <div class="mapbox" id="mapbox">
@@ -259,10 +259,18 @@ function draw() {
     if (!state.show[pr.status]) continue;
     const pts = cut(pr.pts); if (!pts.length) continue;
     const col = `var(--${pr.status})`;
-    const p = el("path", { d: pathD(pts.length > 1 ? pts : [pts[0], pts[0]]), fill: "none", stroke: col, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke", ...(pr.status === "outside" ? { "stroke-dasharray": "4 3" } : {}) }, gP);
+    const nb = pr.nback || 0;
+    const detPts = cut(pr.pts.slice(nb)), backPts = nb ? cut(pr.pts.slice(0, nb + 1)) : [];
     const st = { ok: "Matches a hand-made meso", false: "False alarm", outside: "Outside the truth region (not scored)" }[pr.status];
-    p.dataset.tip = `<b>Predicted ${pr.id}</b> (supercell ${pr.sc})<br>${hhmm(pr.pts[0][0])}–${hhmm(pr.pts[pr.pts.length - 1][0])} · ${pr.pts.length} frames${pr.score != null ? " · peak score " + pr.score.toFixed(2) : ""}<br>${st}`;
-    hover(p);
+    const tip = `<b>Predicted ${pr.id}</b> (supercell ${pr.sc})<br>${hhmm(pr.pts[0][0])}–${hhmm(pr.pts[pr.pts.length - 1][0])} · ${pr.pts.length} frames${pr.score != null ? " · peak score " + pr.score.toFixed(2) : ""}${nb ? `<br>First ${Math.round((pr.pts[nb][0] - pr.pts[0][0]) / 60)} min traced back along the reflectivity cell (dotted)` : ""}<br>${st}`;
+    if (backPts.length > 1) {
+      const b = el("path", { d: pathD(backPts), fill: "none", stroke: col, "stroke-width": 2, "stroke-linecap": "round", "stroke-dasharray": "0.5 4", "vector-effect": "non-scaling-stroke" }, gP);
+      b.dataset.tip = tip; hover(b);
+    }
+    if (detPts.length) {
+      const p = el("path", { d: pathD(detPts.length > 1 ? detPts : [detPts[0], detPts[0]]), fill: "none", stroke: col, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke", ...(pr.status === "outside" ? { "stroke-dasharray": "4 3" } : {}) }, gP);
+      p.dataset.tip = tip; hover(p);
+    }
     const [x0, y0] = proj(pts[0][1], pts[0][2]);
     el("circle", { cx: x0, cy: y0, r: 2.4, fill: col }, gP);
     const last = pts[pts.length - 1];
@@ -346,6 +354,7 @@ function method() {
     "The model outputs a heat map of meso-center likelihood; peaks are the detections. The tracker links detections frame to frame (motion-predicted, 8 km gate, gaps up to two frames), starts tracks only on strong detections, and groups a new meso into an existing supercell when it forms within " + "15–25 km and 20 min of one of that supercell's mesos.",
     "Tracker settings were chosen by grid search on the 2022 held-out days (best meso CSI) and applied unchanged to 2023: " + D.runs.map(r => `${r.label}: start ≥ ${r.settings.start_thr}, continue ≥ ${r.settings.cont_thr}, min ${r.settings.min_len} frames, join ${r.settings.join_km} km`).join("; ") + ".",
     "Reflectivity gates were also tried for the model (drop detections with &lt; 30–40 dBZ within 5 km; drop tracks whose median nearby reflectivity is &lt; 40–55 dBZ). They barely changed anything: every predicted track already sits in ≥ 47 dBZ echo, and false tracks (median 54.5 dBZ) look almost the same as matched ones (56.8 dBZ). Track length separates them far better (median 13 vs 29 frames), which is why the retuned run requires longer tracks.",
+    ...(D.runs.some(r => r.back) ? ["Backward extension (runs marked “traced back”): once a supercell has a model-detected meso, its first meso is followed backward frame by frame along the same composite-reflectivity cell (pattern matching against the next frame, guided by storm motion) until the cell's strongest echo within ~5 km drops below the stop threshold, the match fails, or the data begin. Stop thresholds: " + D.runs.filter(r => r.back).map(r => `${r.label}: ${r.back.stop_dbz} dBZ`).join("; ") + ". On the 2022 days the best meso CSI came at 50 dBZ, because the hand-made tracks usually begin when the cell is about that strong; 35 dBZ follows the cell closer to its first appearance and scores the same on 2023."] : []),
     "The baseline uses the same tracker on 3–6 km AzShear peaks (3×3-mean ≥ 3 ×10⁻³ s⁻¹, with ≥ 35 dBZ nearby) instead of model detections.",
     "Code: <code>ml/</code> in the supercell-site repository (README.md describes each stage)."];
   $("method").innerHTML = items.map(i => `<li>${i}</li>`).join("");

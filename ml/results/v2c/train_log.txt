@@ -1,0 +1,79 @@
+[   0.4 min] 16698 patches from 22 days: pos 6958, hard neg 6427, random 3313; 13151 meso centers
+[   0.4 min] initialized from init/mesonet.pt
+[   0.4 min] MesoNet: 0.89 M parameters
+[   1.0 min] ~1.51 s/step
+[   5.6 min] epoch 0 step 200: loss 2.591 lr 2.00e-03
+[  10.7 min] epoch 0 step 400: loss 2.603 lr 2.00e-03
+[  15.7 min] epoch 0 step 600: loss 2.584 lr 1.99e-03
+[  20.8 min] epoch 0 step 800: loss 2.597 lr 1.98e-03
+[  25.9 min] epoch 0 step 1000: loss 2.593 lr 1.97e-03
+[  27.0 min] epoch 1 done: mean loss 2.590
+[  31.0 min] epoch 1 step 1200: loss 2.551 lr 1.96e-03
+[  36.1 min] epoch 1 step 1400: loss 2.563 lr 1.94e-03
+[  41.2 min] epoch 1 step 1600: loss 2.557 lr 1.92e-03
+[  46.4 min] epoch 1 step 1800: loss 2.546 lr 1.90e-03
+[  51.5 min] epoch 1 step 2000: loss 2.542 lr 1.88e-03
+[  53.7 min] epoch 2 done: mean loss 2.538
+[  56.6 min] epoch 2 step 2200: loss 2.485 lr 1.85e-03
+[  61.7 min] epoch 2 step 2400: loss 2.504 lr 1.83e-03
+[  66.8 min] epoch 2 step 2600: loss 2.517 lr 1.80e-03
+[  71.9 min] epoch 2 step 2800: loss 2.520 lr 1.77e-03
+[  77.0 min] epoch 2 step 3000: loss 2.514 lr 1.74e-03
+[  80.3 min] epoch 3 done: mean loss 2.514
+[  82.0 min] epoch 3 step 3200: loss 2.499 lr 1.70e-03
+[  87.0 min] epoch 3 step 3400: loss 2.480 lr 1.67e-03
+[  92.1 min] epoch 3 step 3600: loss 2.489 lr 1.63e-03
+[  97.1 min] epoch 3 step 3800: loss 2.489 lr 1.59e-03
+[ 102.2 min] epoch 3 step 4000: loss 2.489 lr 1.55e-03
+[ 106.6 min] epoch 4 done: mean loss 2.483
+[ 107.2 min] epoch 4 step 4200: loss 2.472 lr 1.51e-03
+[ 112.3 min] epoch 4 step 4400: loss 2.497 lr 1.47e-03
+[ 117.3 min] epoch 4 step 4600: loss 2.473 lr 1.42e-03
+[ 122.4 min] epoch 4 step 4800: loss 2.463 lr 1.38e-03
+[ 127.4 min] epoch 4 step 5000: loss 2.488 lr 1.33e-03
+[ 132.5 min] epoch 4 step 5200: loss 2.483 lr 1.28e-03
+[ 133.0 min] epoch 5 done: mean loss 2.485
+[ 137.5 min] epoch 5 step 5400: loss 2.470 lr 1.24e-03
+[ 142.6 min] epoch 5 step 5600: loss 2.448 lr 1.19e-03
+[ 147.7 min] epoch 5 step 5800: loss 2.439 lr 1.14e-03
+[ 152.8 min] epoch 5 step 6000: loss 2.441 lr 1.09e-03
+[ 158.0 min] epoch 5 step 6200: loss 2.438 lr 1.04e-03
+[ 159.6 min] epoch 6 done: mean loss 2.434
+[ 163.1 min] epoch 6 step 6400: loss 2.408 lr 9.92e-04
+[ 168.2 min] epoch 6 step 6600: loss 2.409 lr 9.43e-04
+[ 173.3 min] epoch 6 step 6800: loss 2.410 lr 8.94e-04
+[ 178.4 min] epoch 6 step 7000: loss 2.420 lr 8.46e-04
+[ 183.4 min] epoch 6 step 7200: loss 2.430 lr 7.98e-04
+[ 186.2 min] epoch 7 done: mean loss 2.426
+[ 188.5 min] epoch 7 step 7400: loss 2.401 lr 7.51e-04
+[ 193.5 min] epoch 7 step 7600: loss 2.400 lr 7.05e-04
+[ 198.6 min] epoch 7 step 7800: loss 2.391 lr 6.59e-04
+[ 203.6 min] epoch 7 step 8000: loss 2.398 lr 6.15e-04
+[ 208.6 min] epoch 7 step 8200: loss 2.395 lr 5.71e-04
+[ 212.5 min] epoch 8 done: mean loss 2.392
+[ 213.8 min] epoch 8 step 8400: loss 2.467 lr 5.28e-04
+[ 218.9 min] epoch 8 step 8600: loss 2.392 lr 4.86e-04
+[ 224.0 min] epoch 8 step 8800: loss 2.374 lr 4.45e-04
+[ 229.0 min] epoch 8 step 9000: loss 2.371 lr 4.07e-04
+[ 234.1 min] epoch 8 step 9200: loss 2.368 lr 3.69e-04
+[ 239.0 min] epoch 9 done: mean loss 2.370
+[ 239.1 min] epoch 9 step 9400: loss 2.234 lr 3.34e-04
+[ 244.2 min] epoch 9 step 9600: loss 2.367 lr 3.00e-04
+[ 249.3 min] epoch 9 step 9800: loss 2.370 lr 2.67e-04
+[ 254.4 min] epoch 9 step 10000: loss 2.374 lr 2.37e-04
+[ 259.5 min] epoch 9 step 10200: loss 2.363 lr 2.08e-04
+[ 264.6 min] epoch 9 step 10400: loss 2.359 lr 1.82e-04
+[ 265.6 min] epoch 10 done: mean loss 2.358
+[ 269.6 min] epoch 10 step 10600: loss 2.398 lr 1.58e-04
+[ 274.7 min] epoch 10 step 10800: loss 2.363 lr 1.36e-04
+[ 279.7 min] epoch 10 step 11000: loss 2.359 lr 1.16e-04
+[ 284.8 min] epoch 10 step 11200: loss 2.358 lr 9.83e-05
+[ 289.8 min] epoch 10 step 11400: loss 2.356 lr 8.29e-05
+[ 291.9 min] epoch 11 done: mean loss 2.355
+[ 294.9 min] epoch 11 step 11600: loss 2.350 lr 6.96e-05
+[ 300.1 min] epoch 11 step 11800: loss 2.332 lr 5.88e-05
+[ 305.2 min] epoch 11 step 12000: loss 2.337 lr 5.04e-05
+[ 310.2 min] epoch 11 step 12200: loss 2.335 lr 4.45e-05
+[ 315.3 min] epoch 11 step 12400: loss 2.344 lr 4.11e-05
+[ 318.5 min] epoch 12 done: mean loss 2.352
+[ 320.0 min] epoch 13 done: mean loss 2.315
