@@ -28,17 +28,25 @@ NCH = 28
 
 
 def load(folder: Path):
-    parts = [np.load(f) for f in sorted(folder.glob("l2patches_*.npz"))]
-    parts = [p for p in parts if len(p["x"])]
-    x = np.concatenate([p["x"] for p in parts]); m = np.concatenate([p["m"] for p in parts])
-    kind = np.concatenate([p["kind"] for p in parts])
-    by = [[] for _ in range(len(x))]
+    files = sorted(folder.glob("l2patches_*.npz"))
+    sizes = []
+    for f in files:
+        with np.load(f) as p:
+            sizes.append(len(p["kind"]))
+    n = sum(sizes)
+    x = np.empty((n, NCH, P, P), np.uint8); m = np.empty((n, P * P // 8), np.uint8)
+    kind = np.empty(n, np.int8); by = [[] for _ in range(n)]; days = []
     off = 0
-    for p in parts:
-        for i, r, c in p["pts"]:
-            by[off + int(i)].append((r, c))
-        off += len(p["x"])
-    return x, m, kind, by, [str(p["day"]) for p in parts]
+    for f, k in zip(files, sizes):
+        if not k:
+            continue
+        with np.load(f) as p:                        # one day at a time keeps peak memory low
+            x[off:off + k] = p["x"]; m[off:off + k] = p["m"]; kind[off:off + k] = p["kind"]
+            for i, r, c in p["pts"]:
+                by[off + int(i)].append((r, c))
+            days.append(str(p["day"]))
+        off += k
+    return x, m, kind, by, days
 
 
 def make_batch(idx, x, m, by, rng):

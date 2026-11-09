@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import ML_DIR, in_southeast, read_tracks  # noqa: E402
 
 P = 128
-EVERY = 3
+EVERY = 2
 HARD = 2
 NEAR_KM = 25.0
 

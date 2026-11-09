@@ -12,7 +12,7 @@ on:
         default: "ml-l2-patches-v1"
       max_volumes:
         description: "Volumes per day (random subset; ~5 patches each)"
-        default: "120"
+        default: "300"
 
 permissions:
   contents: write
