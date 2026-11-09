@@ -205,8 +205,8 @@ def run(a):
     tag = f"{a.day}_{'-'.join(a.radars)}"
     pd.DataFrame(rows, columns=["site", "vol_t", "row", "col", "lat", "lon", "score", "dbz5"]).to_csv(
         out / f"l2det_{tag}.csv.gz", index=False)
-    pd.DataFrame(vols).to_csv(out / f"l2vols_{tag}.csv", index=False)
-    v = pd.DataFrame(vols)
+    v = pd.DataFrame(vols, columns=["site", "vol_t", "status", "n"])
+    v.to_csv(out / f"l2vols_{tag}.csv", index=False)
     print(tag, v.status.value_counts().to_dict(), len(rows), "detections", f"{(time.time() - t_start) / 60:.1f} min")
 
 
