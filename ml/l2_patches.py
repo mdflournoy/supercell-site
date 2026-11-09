@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Single-site stage 3: training patches from Level II volumes for one event day.
 
-For each radar the analysts used that day (ml/l2/radar_assign.csv), every EVERY-th volume during the
+For each radar the analysts used that day (ml/l2/radar_assign.csv, column radar_used: the radar whose
+volume started at the track time, or the nearest-radar rule on days whose track times are rounded to
+the minute), every EVERY-th volume during the
 times it was used (+/- 15 min) is processed (ml/l2_volume.py) and cut into P x P patches:
   * positive: one per meso that the analysts tracked with this radar at that time (random offset);
   * hard negative: up to HARD per volume centered on strong mid-level azimuthal shear (>= 0.006 s^-1
@@ -170,8 +172,7 @@ def main() -> None:
     tr = tr[tr.file == a.day].sort_values(["label", "t"])
     asg = pd.read_csv(ML_DIR / "l2" / "radar_assign.csv", dtype={"file": str})
     asg = asg[asg.file == a.day]
-    tr = tr.merge(asg[["label", "t", "radar", "near1"]], on=["label", "t"], how="left")
-    tr["radar"] = tr.radar.fillna("").where(tr.radar.fillna("") != "", tr.near1)
+    tr = tr.merge(asg[["label", "t", "radar_used"]].rename(columns={"radar_used": "radar"}), on=["label", "t"], how="left")
     jobs = []
     tr_json = tr[["label", "supercell", "t", "lat", "lon", "radar"]].to_json(orient="split")
     for site, g in tr.groupby("radar"):
