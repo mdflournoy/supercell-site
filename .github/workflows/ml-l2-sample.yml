@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       keys:
-        description: "Space-separated archive keys (YYYY/MM/DD/SITE/file)"
+        description: "Space-separated key prefixes (YYYY/MM/DD/SITE/SITEYYYYMMDD_HH); first volume of each is fetched"
         required: true
 
 permissions:
@@ -18,8 +18,11 @@ jobs:
       - env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           mkdir s && cd s
-          for k in ${{ inputs.keys }}; do
-            curl -fsSL "https://unidata-nexrad-level2.s3.amazonaws.com/$k" -o "$(basename $k)" || curl -fsSL "https://noaa-nexrad-level2.s3.amazonaws.com/$k" -o "$(basename $k)"
+          for p in ${{ inputs.keys }}; do
+            for b in https://unidata-nexrad-level2.s3.amazonaws.com https://noaa-nexrad-level2.s3.amazonaws.com; do
+              k=$(curl -fsSL "$b/?list-type=2&prefix=$p" | grep -o '<Key>[^<]*</Key>' | sed 's/<[^>]*>//g' | grep -v MDM | head -1)
+              if [ -n "$k" ]; then curl -fsSL "$b/$k" -o "$(basename $k)" && break; fi
+            done
           done
           ls -la
           gh release view ml-l2-sample -R ${{ github.repository }} >/dev/null 2>&1 || gh release create ml-l2-sample -R ${{ github.repository }} --prerelease --title "ML Level II samples" --notes "Sample volumes for development"
