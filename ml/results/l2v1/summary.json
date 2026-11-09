@@ -1,0 +1,34 @@
+{
+ "settings": {
+  "model": {
+   "start_thr": 0.3,
+   "cont_thr": 0.15,
+   "gate_km": 8.0,
+   "max_gap": 2,
+   "min_len": 20,
+   "join_km": 15.0,
+   "join_min": 20.0,
+   "dbz_min": -99.0,
+   "trk_dbz": -99.0
+  }
+ },
+ "back": null,
+ "test": {
+  "model": {
+   "meso_pod": 0.2616279069767442,
+   "meso_far": 0.6463414634146342,
+   "meso_csi": 0.2,
+   "sc_pod": 0.3614457831325301,
+   "sc_csi": 0.22556390977443608
+  }
+ },
+ "validation": {
+  "model": {
+   "meso_pod": 0.3382352941176471,
+   "meso_far": 0.5806451612903226,
+   "meso_csi": 0.26744186046511625,
+   "sc_pod": 0.4,
+   "sc_csi": 0.27450980392156865
+  }
+ }
+}
