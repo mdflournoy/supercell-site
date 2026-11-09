@@ -1,0 +1,26 @@
+name: ML - fetch sample Level II volumes
+
+# Copies a few Level II volumes into the ml-l2-sample pre-release (for local development).
+on:
+  workflow_dispatch:
+    inputs:
+      keys:
+        description: "Space-separated archive keys (YYYY/MM/DD/SITE/file)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          mkdir s && cd s
+          for k in ${{ inputs.keys }}; do
+            curl -fsSL "https://unidata-nexrad-level2.s3.amazonaws.com/$k" -o "$(basename $k)" || curl -fsSL "https://noaa-nexrad-level2.s3.amazonaws.com/$k" -o "$(basename $k)"
+          done
+          ls -la
+          gh release view ml-l2-sample -R ${{ github.repository }} >/dev/null 2>&1 || gh release create ml-l2-sample -R ${{ github.repository }} --prerelease --title "ML Level II samples" --notes "Sample volumes for development"
+          gh release upload ml-l2-sample -R ${{ github.repository }} * --clobber
