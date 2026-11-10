@@ -235,6 +235,7 @@
     const showNon = $("showNon").checked, showTor = $("showTorM").checked, showPaths = $("showPaths").checked;
     const surface = css("--surface"), nonC = css("--nontor"), torC = css("--tor"), pathC = css("--torpath");
     const order = sel.mesos.slice().sort((x, y) => M[x].tornadic - M[y].tornadic); // tornadic on top
+    if ($("showWarn").checked && WARN) drawWarn(sel, a, b, showNon, showTor);
     if ($("showEnv").checked && ENV) drawEnv(sel, a, b, showNon, showTor, torC, nonC);
     const labelsOn = b - a <= 36 * 3600, labels = [];
     for (const mi of order) {
@@ -364,6 +365,67 @@
       poly._envOn = on; poly._envOff = off;
       poly.addTo(layer);
     }
+  }
+
+  // ---------------------------------------------------------------- NWS warnings and statements
+  // warnings.json (scripts/build_data.py + scripts/nws_products.py): tornado / severe thunderstorm warning
+  // polygons as issued and special weather statement polygons, each tied to the mesos it was issued for.
+  let WARN = null, warnLoading = null;
+  async function loadWarn() {
+    if (WARN) return WARN;
+    warnLoading ||= fetch("warnings.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { WARN = d.recs || []; return WARN; }).catch((err) => { console.warn("warnings.json:", err); WARN = []; return WARN; });
+    return warnLoading;
+  }
+  const WARN_KIND = {
+    TO: { name: "Tornado Warning", box: "warnTor", c: "--w-tor", z: 3 },
+    SV: { name: "Severe Thunderstorm Warning", box: "warnSvr", c: "--w-svr", z: 2 },
+    SPS: { name: "Special Weather Statement", box: "warnSps", c: "--w-sps", z: 1 },
+  };
+  const titleCase = (v) => String(v).toLowerCase().replace(/\b\w/g, (x) => x.toUpperCase());
+  function warnTags(w) {
+    const g = w.tags || {}, out = [];
+    if (g.is_emergency || g.max_is_emergency) out.push("Tornado emergency");
+    if (g.is_pds || g.max_is_pds) out.push("PDS");
+    if (g.tornadotag) out.push(`Tornado: ${titleCase(g.tornadotag)}`);
+    if (g.damagetag) out.push(`Damage threat: ${titleCase(g.damagetag)}`);
+    const hail = g.max_hailtag ?? g.hailtag ?? g.hail, wind = g.max_windtag ?? g.windtag ?? g.wind;
+    if (hail != null && hail !== "" && +hail > 0) out.push(`Hail ${hail} in`);
+    if (wind != null && wind !== "" && +wind > 0) out.push(`Wind ${wind} mph`);
+    if (g.landspout) out.push(`Landspout: ${titleCase(g.landspout)}`);
+    if (g.waterspout) out.push(`Waterspout: ${titleCase(g.waterspout)}`);
+    return out;
+  }
+  function drawWarn(sel, a, b, showNon, showTor) {
+    const want = new Set(sel.mesos.filter((mi) => (M[mi].tornadic ? showTor : showNon) && (!scShow || scShow.has(M[mi].sc))));
+    const recs = WARN.filter((w) => $(WARN_KIND[w.k].box).checked && w.iss <= b && (w.exp ?? w.iss) >= a && w.m.some((mi) => want.has(mi)))
+      .sort((x, y) => WARN_KIND[x.k].z - WARN_KIND[y.k].z || x.iss - y.iss);
+    for (const w of recs) {
+      const K = WARN_KIND[w.k], c = css(K.c);
+      const ms = w.m.filter((mi) => want.has(mi)), scs = uniq(ms.map((mi) => M[mi].sc));
+      const mlab = ms.map((mi) => M[mi].label).join(", ");
+      const tags = warnTags(w);
+      const head = `${K.name}${w.n != null ? ` #${w.n}` : ""} · ${w.wfo}`;
+      const when = `${fmtT(w.iss)} → ${w.exp ? fmtHM(w.exp) : "—"}${w.exp ? ` (${dur((w.exp - w.iss) / 60)})` : ""}`;
+      const tip = `<b>${head}</b><br>${when}<br>Issued for meso ${mlab}${tags.length ? `<br>${tags.join(" · ")}` : ""}`;
+      const pop = `<div class="pop"><h3>${head}</h3><div class="meta">${S[scs[0]].date} · polygon as issued</div><table>
+          <tr><td>Valid</td><td>${when}</td></tr>
+          <tr><td>Issued for</td><td>meso ${mlab} (supercell${scs.length > 1 ? "s" : ""} ${scs.map((si) => S[si].label).join(", ")})</td></tr>
+          ${tags.length ? `<tr><td>Tags</td><td>${tags.join(" · ")}</td></tr>` : ""}
+          ${w.url ? `<tr><td>Text</td><td><a href="${w.url}" target="_blank" rel="noopener">Iowa Environmental Mesonet</a></td></tr>` : ""}
+        </table></div>`;
+      const base = { renderer, color: c, weight: 1.5, opacity: 0.95, fillColor: c, fillOpacity: w.k === "SPS" ? 0.06 : 0.1, dashArray: w.k === "SPS" ? "5 4" : null };
+      const poly = L.polygon(w.poly, base);
+      poly.bindTooltip(tip, { className: "mt-tip", sticky: true, direction: "top", offset: [0, -8] }).bindPopup(pop, { maxWidth: 420 })
+        .on("mouseover", () => { poly.setStyle({ weight: 3, fillOpacity: base.fillOpacity + 0.12 }); scs.forEach((si) => highlight(si, true)); })
+        .on("mouseout", () => { poly.setStyle({ weight: base.weight, fillOpacity: base.fillOpacity }); scs.forEach((si) => highlight(si, false)); });
+      poly.addTo(layer);
+    }
+  }
+  function warnUI() {
+    const on = $("showWarn").checked;
+    $("nwsSub").hidden = !on;
+    document.querySelectorAll(".nws-key").forEach((k) => { k.hidden = !on || !$(WARN_KIND[k.dataset.k].box).checked; });
   }
 
   // ---- sounding card (hover tip + pinned, draggable windows) ----
@@ -1382,6 +1444,15 @@
 
   ["showNon", "showTorM", "showPaths"].forEach((id) => $(id).addEventListener("change", () => render()));
   $("showEnv").addEventListener("change", async () => { if ($("showEnv").checked) await loadEnv(); render(); });
+  // Warnings: off at load; each time it is turned on, statements start off and both warning types on
+  $("showWarn").checked = false;
+  $("showWarn").addEventListener("change", async () => {
+    if ($("showWarn").checked) { $("warnSps").checked = false; $("warnSvr").checked = true; $("warnTor").checked = true; }
+    warnUI();
+    if ($("showWarn").checked) await loadWarn();
+    render();
+  });
+  ["warnSps", "warnSvr", "warnTor"].forEach((id) => $(id).addEventListener("change", () => { warnUI(); render(); }));
   $("fitBtn").addEventListener("click", () => fitToSelection(select()));
 
   // theme

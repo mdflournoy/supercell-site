@@ -15,6 +15,7 @@
   --torpath: #0b0b0b;  /* tornado damage path: heavy ink line */
   --accent: #2a78d6;
   --az-nodata: #b9b7b0;
+  --w-tor: #d1131b; --w-svr: #e08a00; --w-sps: #a07a3c;   /* NWS warning colors: tornado red, severe orange, statement tan */
   --ord-only: #898781; --ord-1: #0d0887; --ord-2: #7401a8; --ord-3: #bf3984; --ord-4: #ee7b51; --ord-5: #fcce25;
   --ef-u: #898781; --ef-0: #0d0887; --ef-1: #6300a7; --ef-2: #a51f99; --ef-3: #d5536f; --ef-4: #f58b47; --ef-5: #fcce25;
   --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
@@ -28,6 +29,7 @@
     --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --az-nodata: #55544f; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
     --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
     --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
+    --w-tor: #ff4a4a; --w-svr: #ffb020; --w-sps: #e3c58f;
     --shadow: none;
   }
 }
@@ -39,6 +41,7 @@
   --nontor: #3987e5; --tor: #e66767; --torpath: #ffffff; --accent: #3987e5; --az-nodata: #55544f; --non-before: #9ec5f4; --non-between: #3987e5; --non-after: #1c5cab;
     --ord-only: #898781; --ord-1: #4903a0; --ord-2: #9e199d; --ord-3: #d9586a; --ord-4: #fb9f3a; --ord-5: #f0f921;
     --ef-u: #898781; --ef-0: #4903a0; --ef-1: #8e0ca4; --ef-2: #c43e7f; --ef-3: #e97257; --ef-4: #fdaf31; --ef-5: #f0f921;
+  --w-tor: #ff4a4a; --w-svr: #ffb020; --w-sps: #e3c58f;
   --shadow: none;
 }
 
@@ -122,6 +125,13 @@ button.ghost { background: transparent; }
 .legend .sw.tor { border-color: var(--tor); }
 .legend .sw.non { border-color: var(--nontor); }
 .legend .sw.path { border-top-width: 5px; border-color: var(--torpath); }
+.map-head .nws-sub { display: inline-flex; gap: 10px; padding-left: 10px; border-left: 1px solid var(--ring); }
+.map-head .nws-sub[hidden] { display: none; }
+.legend .key[hidden] { display: none; }
+.legend .box { width: 16px; height: 11px; border: 2px solid; border-radius: 2px; }
+.legend .box.tor-w { border-color: var(--w-tor); background: color-mix(in srgb, var(--w-tor) 14%, transparent); }
+.legend .box.svr-w { border-color: var(--w-svr); background: color-mix(in srgb, var(--w-svr) 14%, transparent); }
+.legend .box.sps-w { border-color: var(--w-sps); border-style: dashed; background: color-mix(in srgb, var(--w-sps) 14%, transparent); }
 .legend .dot { width: 8px; height: 8px; border-radius: 1px; background: var(--surface); border: 2px solid var(--ink-2); }
 
 .leaflet-container { font: inherit; }

@@ -135,6 +135,13 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   every parameter in `env-params/` from `site/env.json`. The page loads these from `site/env.json`
   only when the box is first checked. A dot marks each slice's apex on its parent track; hovering a slice
   or dot also highlights the parent supercell.
+- **Warnings** checkbox (above the map, off by default): draws the NWS products issued for the tracked
+  storms — tornado warnings (red), severe thunderstorm warnings (orange) and special weather statements
+  (tan, dashed) — as polygons as issued. Turning it on shows **Statements**, **Severe** and **Tornado**
+  boxes to switch each type on or off (statements start off, both warnings on). A product is shown while
+  its valid time overlaps the window and at least one of its mesos is on the map; hovering it highlights
+  those supercells, and the popup links to the product on the Iowa Environmental Mesonet. Loaded from
+  `site/warnings.json` only when the box is first checked (see *NWS warnings and statements* below).
 - **Meso IDs on the map** (e.g. `A1`, in the track's color, at the start of each track) whenever the
   window spans about a day or less — e.g. after picking a day.
 - **Supercells** menu (left of "Jump to a day"): appears once a day is selected (dropdown or Days table)
@@ -192,6 +199,17 @@ Source: `s3://noaa-mrms-pds/CONUS/MergedAzShear_0-2kmAGL_00.50/` and `..._3-6kmA
 Each MRMS file is processed once; results are cached in `azshear-cache/cache.csv`, so nightly
 runs only fetch what new or edited tracks need. A run spends at most ~4 hours on MRMS and
 resumes where it left off on the next run; `azshear-cache/status.json` summarizes the last run.
+
+## NWS warnings and statements (`nws-cache/`)
+
+`scripts/nws_products.py` downloads, for every event in `tracks/`, the tornado (TO.W) and severe
+thunderstorm (SV.W) warning polygons as issued (IEM `geojson/sbw.geojson`) and the special weather
+statement polygons (IEM `cgi-bin/request/gis/sps.py`) issued from 3 h before the first to 1 h after the
+last track point, within 1.5° of the tracks, into `nws-cache/<event>.json`. An event is downloaded again
+only if its tracks grow beyond the cached span or box. `scripts/build_data.py` then keeps a product only
+if it was issued for a tracked meso: the meso's track, sampled every minute from 10 min before issuance
+to 30 min after (and not past expiration), comes inside the polygon or within 5 km of its edge. The
+result, with the mesos each product belongs to, is `site/warnings.json`.
 
 ## HRRR near-storm environments (`env-profiles/`, `env-params/`)
 

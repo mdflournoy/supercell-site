@@ -106,6 +106,7 @@ def main() -> None:
     ap.add_argument("--azshear-dir", default=None, help="folder of MRMS AzShear series (tracks-AzShear/)")
     ap.add_argument("--env-params", default=None, help="folder of HRRR inflow parameters (env-params/)")
     ap.add_argument("--env-profiles", default=None, help="folder of HRRR inflow soundings (env-profiles/)")
+    ap.add_argument("--nws-cache", default=None, help="folder of downloaded NWS warnings/statements (nws-cache/)")
     a = ap.parse_args()
 
     allcsv = sorted(p for p in Path(a.raw).rglob("*") if p.suffix.lower() == ".csv" and p.name != "id_map.csv")
@@ -268,6 +269,30 @@ def main() -> None:
         env_out = Path(a.out).with_name("env.json")
         env_out.write_text(json.dumps({"cols": ENV_COLS, "recs": env}, separators=(",", ":")).replace("NaN", "null"))
         print(f"HRRR environments: {len(env)} meso-hours -> {env_out} ({env_out.stat().st_size/1e6:.1f} MB)")
+
+    # NWS tornado/severe warnings and special weather statements tied to the tracks -> site/warnings.json
+    # (loaded by the page only when "Warnings" is on)
+    if a.nws_cache and Path(a.nws_cache).is_dir():
+        import numpy as np
+        import nws_products
+        recs = []
+        for ci, c in enumerate(cases):
+            f = Path(a.nws_cache) / f"{Path(c['file']).stem}.json"
+            if not f.exists():
+                continue
+            try:
+                prods = json.loads(f.read_text())["products"]
+            except Exception as e:  # noqa: BLE001
+                problems.append(f"{f.name}: NWS products file unreadable ({e})")
+                continue
+            ms = [(mi, np.array(mesos[mi]["pts"], float)) for si in c["sc"] for mi in supercells[si]["mesos"]]
+            for p in nws_products.associate(prods, ms):
+                recs.append({"k": p["k"], "wfo": p["wfo"], "n": p["n"], "iss": p["iss"], "exp": p["exp"], "tags": p["tags"],
+                             "url": p["url"], "poly": p["poly"], "m": p["m"]})
+        wout = Path(a.out).with_name("warnings.json")
+        wout.write_text(json.dumps({"recs": recs}, separators=(",", ":")))
+        kinds = pd.Series([r["k"] for r in recs]).value_counts().to_dict() if recs else {}
+        print(f"NWS products tied to tracks: {len(recs)} {kinds} -> {wout} ({wout.stat().st_size/1e6:.2f} MB)")
 
     for s in supercells:
         ts = [p[0] for mi in s["mesos"] for p in mesos[mi]["pts"]]

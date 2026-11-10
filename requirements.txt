@@ -5,3 +5,4 @@ google-auth>=2.23
 pygrib>=2.1.5
 metpy>=1.6
 ecape==0.1.1
+pyshp>=2.3
