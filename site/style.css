@@ -136,6 +136,12 @@ button.ghost { background: transparent; }
 .legend .dbz-lab { font-size: 11px; color: var(--muted); }
 .radar-time { background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 6px;
   padding: 3px 8px; font: 500 12px/1.4 system-ui, sans-serif; box-shadow: var(--shadow); }
+.radar-hint { display: flex; align-items: center; gap: 8px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--ring); border-left: 3px solid #01c501; border-radius: 6px; padding: 6px 6px 6px 10px;
+  font: 13px/1.4 system-ui, sans-serif; box-shadow: var(--shadow);
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; width: max-content; max-width: calc(100% - 140px); }
+.radar-hint[hidden] { display: none; }
+.radar-hint button { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
 .radar-time .dim { color: var(--muted); font-weight: 400; }
 .legend .box { width: 16px; height: 11px; border: 2px solid; border-radius: 2px; }
 .legend .box.tor-w { border-color: var(--w-tor); background: color-mix(in srgb, var(--w-tor) 14%, transparent); }

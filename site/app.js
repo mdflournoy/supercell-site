@@ -439,6 +439,16 @@
   const radarInfo = L.control({ position: "bottomright" });
   radarInfo.onAdd = () => { const d = L.DomUtil.create("div", "radar-time"); d.hidden = true; return d; };
   radarInfo.addTo(map);
+  // how-to hint, shown each time Radar is turned on, until the end of the window moves or it is closed
+  const radarHint = (() => {
+    const d = L.DomUtil.create("div", "radar-hint", map.getContainer());
+    d.hidden = true;
+    d.innerHTML = `<span>Drag the <b>end</b> (right handle) of the time slider to step the radar — or click the map and use ← →</span><button type="button" aria-label="Close">×</button>`;
+    L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+    d.querySelector("button").addEventListener("click", () => (d.hidden = true));
+    return { getContainer: () => d };
+  })();
+  let hintEnd = null;
   async function loadRadar(ci) {
     if (RADAR.day === ci && RADAR.idx !== undefined) return RADAR.idx;
     RADAR.day = ci; RADAR.idx = undefined;
@@ -466,7 +476,9 @@
     return { k: t - fr[k].t <= idx.step_s ? k : -1 };
   }
   function drawRadar() {
-    const box = radarInfo.getContainer();
+    const box = radarInfo.getContainer(), hint = radarHint.getContainer();
+    if (!$("showRadar").checked) hint.hidden = true;
+    else if (hintEnd != null && win[1] !== hintEnd) { hint.hidden = true; hintEnd = null; }
     const on = $("showRadar").checked && RADAR.pick != null && RADAR.day === RADAR.pick && RADAR.idx;
     const { k, edge } = on ? radarFrame(RADAR.idx, win[1]) : { k: -1 };
     if (k < 0) {
@@ -1524,6 +1536,7 @@
   radarUI();
   $("showRadar").addEventListener("change", async () => {
     radarUI();
+    if ($("showRadar").checked) { radarHint.getContainer().hidden = false; hintEnd = win[1]; }
     if ($("showRadar").checked && pickDay != null) await loadRadar(pickDay);
     drawRadar();
   });
