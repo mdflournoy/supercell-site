@@ -475,7 +475,7 @@
     if (!RADAR.overlay) RADAR.overlay = L.imageOverlay(url, f.b, { pane: "radar", opacity: 0.8, interactive: false }).addTo(map);
     else if (RADAR.overlay._url !== url) { RADAR.overlay.setUrl(url); RADAR.overlay.setBounds(L.latLngBounds(f.b)); }
     box.hidden = false;
-    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">UTC · ${f.radars.join(", ")}</span>`;
+    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">· ${f.radars.join(", ")}</span>`;
   }
   function radarUI() {
     const ok = RADAR.pick != null;
