@@ -1,0 +1,50 @@
+name: Radar frames
+
+# Builds the lowest-tilt reflectivity loop (closest-radar mosaic within 50 km of active storms) for
+# event days (scripts/radar_frames.py) and stores each day as radar_<event>.tar in the radar-frames
+# release. The site build unpacks these into site/radar/<event>/; nothing is committed to the repository.
+
+on:
+  workflow_dispatch:
+    inputs:
+      events:
+        description: "Event files (YYYYMMDD), comma-separated"
+        default: "20230331"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      events: ${{ steps.p.outputs.events }}
+    steps:
+      - id: p
+        run: echo "events=$(python3 -c 'import json,sys; print(json.dumps([e.strip() for e in sys.argv[1].split(",") if e.strip()]))' '${{ inputs.events }}')" >> "$GITHUB_OUTPUT"
+
+  frames:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        event: ${{ fromJSON(needs.plan.outputs.events) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas requests pillow arm_pyart
+      - name: Build frames
+        run: python scripts/radar_frames.py --event ${{ matrix.event }} --tracks tracks --out radar --workers 4
+      - name: Store in the radar-frames release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -cf radar_${{ matrix.event }}.tar -C radar ${{ matrix.event }}
+          ls -la radar_${{ matrix.event }}.tar
+          gh release view radar-frames -R ${{ github.repository }} >/dev/null 2>&1 || gh release create radar-frames -R ${{ github.repository }} --prerelease --title "Radar frames" --notes "Lowest-tilt reflectivity loops per event (scripts/radar_frames.py); unpacked into the site at build time"
+          gh release upload radar-frames -R ${{ github.repository }} radar_${{ matrix.event }}.tar --clobber
