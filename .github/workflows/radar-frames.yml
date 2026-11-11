@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install numpy pandas
+      - run: pip install numpy pandas requests
       - id: p
         run: |
           python scripts/radar_frames.py --plan --tracks tracks --manifest radar-cache/manifest.json > plan.json
