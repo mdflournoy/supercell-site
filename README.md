@@ -142,6 +142,11 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   its valid time overlaps the window and at least one of its mesos is on the map; hovering it highlights
   those supercells, and the popup links to the product on the Iowa Environmental Mesonet. Loaded from
   `site/warnings.json` only when the box is first checked (see *NWS warnings and statements* below).
+- **Radar** checkbox (off by default; only after a single day is picked): lowest-tilt (0.5°) reflectivity
+  from the closest radar, within 50 km of the storms active at the time, every 5 min. The frame shown is
+  the one at the **end** of the time window — drag the slider's right handle (or click the map and use
+  ← →) to loop; a note at the top of the map says so when Radar is turned on. All of the day's frames load
+  at once so the loop steps instantly. The corner label gives the frame time and the radars used.
 - **Meso IDs on the map** (e.g. `A1`, in the track's color, at the start of each track) whenever the
   window spans about a day or less — e.g. after picking a day.
 - **Supercells** menu (left of "Jump to a day"): appears once a day is selected (dropdown or Days table)
@@ -199,6 +204,21 @@ Source: `s3://noaa-mrms-pds/CONUS/MergedAzShear_0-2kmAGL_00.50/` and `..._3-6kmA
 Each MRMS file is processed once; results are cached in `azshear-cache/cache.csv`, so nightly
 runs only fetch what new or edited tracks need. A run spends at most ~4 hours on MRMS and
 resumes where it left off on the next run; `azshear-cache/status.json` summarizes the last run.
+
+## Radar loops (`radar-cache/`, release `radar-frames`)
+
+`scripts/radar_frames.py` builds, for each event, a loop of lowest-tilt (0.5°) reflectivity every 5 min
+from 30 min before the first to 30 min after the last track point. A frame covers only the ground within
+50 km of a mesocyclone active at that time; each ~1 km pixel takes the newest low sweep (SAILS included,
+at most 12 min old) of its closest NEXRAD, read from the Level II archive on AWS. Frames are paletted PNGs
+on a Web Mercator grid (1 dB steps from 5 dBZ). Each day is stored as `radar_<event>.tar` in the
+`radar-frames` release, not in the repository, and the site build unpacks them into `site/radar/`.
+
+`.github/workflows/radar-frames.yml` runs every night at 03:17 UTC, before the site rebuild: it builds the
+days that are new or whose track points changed (`radar-cache/manifest.json` keeps a fingerprint of each
+day's points), drops loops of deleted days, and then starts a site rebuild. Run it by hand with
+`events = auto`, or list days to rebuild them. Budget: ~1 MB per day on average (3/31/23, a large day,
+is 1.8 MB), so 250 days ≈ 240 MB against the 1 GB GitHub Pages limit.
 
 ## NWS warnings and statements (`nws-cache/`)
 

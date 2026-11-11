@@ -2,36 +2,75 @@ name: Radar frames
 
 # Builds the lowest-tilt reflectivity loop (closest-radar mosaic within 50 km of active storms) for
 # event days (scripts/radar_frames.py) and stores each day as radar_<event>.tar in the radar-frames
-# release. The site build unpacks these into site/radar/<event>/; nothing is committed to the repository.
+# release; the site build unpacks these into site/radar/<event>/ (no images are committed).
+#
+# Every night (before the midnight-Central site rebuild) it builds only the days that are new or whose
+# track points changed since their loop was made (radar-cache/manifest.json holds a fingerprint of each
+# day's track points), removes loops of deleted days, and then starts a site rebuild if anything changed.
+# "Run workflow" with events = auto does the same now; a comma-separated list rebuilds those days.
 
 on:
+  schedule:
+    - cron: "17 3 * * *"     # 03:17 UTC, ahead of the 05/06 UTC site rebuild
   workflow_dispatch:
     inputs:
       events:
-        description: "Event files (YYYYMMDD), comma-separated"
-        default: "20230331"
+        description: "auto (new/changed days) or event files (YYYYMMDD), comma-separated"
+        default: "auto"
 
 permissions:
   contents: write
+  actions: write
+
+concurrency:
+  group: radar-frames
+  cancel-in-progress: false
 
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
-      events: ${{ steps.p.outputs.events }}
+      build: ${{ steps.p.outputs.build }}
+      drop: ${{ steps.p.outputs.drop }}
+      any: ${{ steps.p.outputs.any }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas
       - id: p
-        run: echo "events=$(python3 -c 'import json,sys; print(json.dumps([e.strip() for e in sys.argv[1].split(",") if e.strip()]))' '${{ inputs.events }}')" >> "$GITHUB_OUTPUT"
+        run: |
+          python scripts/radar_frames.py --plan --tracks tracks --manifest radar-cache/manifest.json > plan.json
+          req="${{ inputs.events }}"
+          python3 - "$req" <<'EOF'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          req = (sys.argv[1] or "auto").strip()
+          plan = json.load(open("plan.json"))
+          if req and req != "auto":
+              import radar_frames
+              plan["build"] = [{"event": e, "fp": radar_frames.fingerprint(Path("tracks") / f"{e}.csv")}
+                               for e in (x.strip() for x in req.split(",")) if e and (Path("tracks") / f"{e}.csv").exists()]
+              plan["drop"] = []
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"build={json.dumps(plan['build'])}\n")
+              f.write(f"drop={json.dumps(plan['drop'])}\n")
+              f.write(f"any={'true' if plan['build'] or plan['drop'] else 'false'}\n")
+          print("build:", [b["event"] for b in plan["build"]], "drop:", plan["drop"])
+          EOF
 
   frames:
     needs: plan
+    if: needs.plan.outputs.build != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     strategy:
       fail-fast: false
       max-parallel: 10
       matrix:
-        event: ${{ fromJSON(needs.plan.outputs.events) }}
+        job: ${{ fromJSON(needs.plan.outputs.build) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,12 +78,66 @@ jobs:
           python-version: "3.12"
       - run: pip install numpy pandas requests pillow arm_pyart
       - name: Build frames
-        run: python scripts/radar_frames.py --event ${{ matrix.event }} --tracks tracks --out radar --workers 4
+        run: python scripts/radar_frames.py --event ${{ matrix.job.event }} --tracks tracks --out radar --workers 4
       - name: Store in the radar-frames release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tar -cf radar_${{ matrix.event }}.tar -C radar ${{ matrix.event }}
-          ls -la radar_${{ matrix.event }}.tar
+          tar -cf radar_${{ matrix.job.event }}.tar -C radar ${{ matrix.job.event }}
+          ls -la radar_${{ matrix.job.event }}.tar
           gh release view radar-frames -R ${{ github.repository }} >/dev/null 2>&1 || gh release create radar-frames -R ${{ github.repository }} --prerelease --title "Radar frames" --notes "Lowest-tilt reflectivity loops per event (scripts/radar_frames.py); unpacked into the site at build time"
-          gh release upload radar-frames -R ${{ github.repository }} radar_${{ matrix.event }}.tar --clobber
+          gh release upload radar-frames -R ${{ github.repository }} radar_${{ matrix.job.event }}.tar --clobber
+          mkdir -p done && echo '{"event": "${{ matrix.job.event }}", "fp": "${{ matrix.job.fp }}"}' > done/${{ matrix.job.event }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: done-${{ matrix.job.event }}
+          path: done/
+          retention-days: 3
+
+  record:
+    needs: [plan, frames]
+    if: ${{ always() && needs.plan.outputs.any == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: done-*
+          path: done
+          merge-multiple: true
+        continue-on-error: true
+      - name: Remove loops of deleted days
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for e in $(echo '${{ needs.plan.outputs.drop }}' | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin)))'); do
+            gh release delete-asset radar-frames radar_$e.tar -R ${{ github.repository }} -y || true
+          done
+      - name: Update radar-cache/manifest.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            python3 - '${{ needs.plan.outputs.drop }}' <<'EOF'
+          import glob, json, sys
+          from pathlib import Path
+          p = Path("radar-cache/manifest.json"); p.parent.mkdir(exist_ok=True)
+          m = json.loads(p.read_text()) if p.exists() else {}
+          for e in json.loads(sys.argv[1]):
+              m.pop(e, None)
+          for f in glob.glob("done/*.json"):
+              d = json.load(open(f)); m[d["event"]] = d["fp"]
+          p.write_text(json.dumps(dict(sorted(m.items())), indent=1) + "\n")
+          print(len(m), "days with radar loops")
+          EOF
+            git add radar-cache/manifest.json
+            git diff --cached --quiet && { echo "manifest unchanged"; exit 0; }
+            git commit -qm "Radar loops: update manifest" && git push -q origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
+      - name: Rebuild the site with the new loops
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly.yml -R ${{ github.repository }} --ref main

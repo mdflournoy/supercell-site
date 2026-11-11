@@ -12,6 +12,9 @@ Output: <out>/<event>/index.json and one paletted PNG per frame (1 dB steps from
 below 5 dBZ and where no radar data).
 
   python scripts/radar_frames.py --event 20230331 --tracks tracks --out radar --workers 4
+  python scripts/radar_frames.py --plan --tracks tracks --manifest radar-cache/manifest.json
+      -> JSON {"build": [{"event", "fp"}...], "drop": [events]}: events whose track points changed (or that
+         have no loop yet), and loops whose event file is gone. radar-frames.yml uses this every night.
 """
 from __future__ import annotations
 
@@ -32,6 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "ml"))
 
+VERSION = 1             # bump to rebuild every loop after a change to how frames are made
 STEP_S = 300
 PAD_S = 1800            # frames from 30 min before the first to 30 min after the last track point
 ACTIVE_PAD_S = 600      # a meso counts as active from 10 min before its first to 10 min after its last point
@@ -240,14 +244,45 @@ def _init():
     os.environ["OMP_NUM_THREADS"] = "1"
 
 
+# ---------------------------------------------------------------- what needs (re)building
+def fingerprint(path: Path) -> str | None:
+    """Hash of the track points (time, position) and VERSION: only these change the frames."""
+    import hashlib
+    import nws_products
+    try:
+        d = nws_products.read_points(path)
+    except Exception:  # noqa: BLE001
+        return None
+    if d.empty:
+        return None
+    pts = sorted(zip(d.t.round().astype(int), d.la.round(4), d.lo.round(4)))
+    return hashlib.sha1(f"v{VERSION}|{pts}".encode()).hexdigest()[:16]
+
+
+def plan_main(tracks: Path, manifest: Path) -> None:
+    done = json.loads(manifest.read_text()) if manifest.exists() else {}
+    events = {p.stem: p for p in sorted(tracks.glob("*.csv")) if p.stem[:8].isdigit() and len(p.stem) == 8}
+    build = []
+    for ev, p in events.items():
+        fp = fingerprint(p)
+        if fp and done.get(ev) != fp:
+            build.append({"event": ev, "fp": fp})
+    drop = sorted(set(done) - set(events))
+    print(json.dumps({"build": build, "drop": drop}))
+
+
 # ---------------------------------------------------------------- main
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--event", required=True)
+    ap.add_argument("--event")
+    ap.add_argument("--plan", action="store_true")
+    ap.add_argument("--manifest", default="radar-cache/manifest.json")
     ap.add_argument("--tracks", default="tracks")
     ap.add_argument("--out", default="radar")
     ap.add_argument("--workers", type=int, default=4)
     a = ap.parse_args()
+    if a.plan:
+        return plan_main(Path(a.tracks), Path(a.manifest))
     from PIL import Image
     t_start = time.time()
     mesos = meso_tracks(Path(a.tracks) / f"{a.event}.csv")
