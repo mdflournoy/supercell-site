@@ -128,6 +128,15 @@ button.ghost { background: transparent; }
 .map-head .nws-sub { display: inline-flex; gap: 10px; padding-left: 10px; border-left: 1px solid var(--ring); }
 .map-head .nws-sub[hidden] { display: none; }
 .legend .key[hidden] { display: none; }
+.map-head label.is-off { opacity: 0.45; cursor: not-allowed; }
+.leaflet-radar-pane img { image-rendering: pixelated; }
+.legend .dbz-bar { width: 96px; height: 10px; border-radius: 2px;
+  background: linear-gradient(90deg, #04e9e7 0%, #019ff4 7%, #0300f4 14%, #02fd02 21%, #01c501 29%, #008e00 36%,
+    #fdf802 43%, #e5bc00 50%, #fd9500 57%, #fd0000 64%, #d40000 71%, #bc0000 79%, #f800fd 86%, #9854c6 93%, #fdfdfd 100%); }
+.legend .dbz-lab { font-size: 11px; color: var(--muted); }
+.radar-time { background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 6px;
+  padding: 3px 8px; font: 500 12px/1.4 system-ui, sans-serif; box-shadow: var(--shadow); }
+.radar-time .dim { color: var(--muted); font-weight: 400; }
 .legend .box { width: 16px; height: 11px; border: 2px solid; border-radius: 2px; }
 .legend .box.tor-w { border-color: var(--w-tor); background: color-mix(in srgb, var(--w-tor) 14%, transparent); }
 .legend .box.svr-w { border-color: var(--w-svr); background: color-mix(in srgb, var(--w-svr) 14%, transparent); }

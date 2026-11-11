@@ -428,6 +428,64 @@
     document.querySelectorAll(".nws-key").forEach((k) => { k.hidden = !on || !$(WARN_KIND[k.dataset.k].box).checked; });
   }
 
+  // ---------------------------------------------------------------- radar (lowest-tilt reflectivity loop)
+  // radar/<event>/index.json + one PNG per 5-min frame (scripts/radar_frames.py): closest-radar 0.5° reflectivity
+  // within 50 km of the storms active at that time. Only for a single picked day; the frame shown is the one at
+  // the end of the time window. All of the day's frames are preloaded so dragging the slider loops smoothly.
+  map.createPane("radar").style.zIndex = 340; // above the basemap, below place labels and tracks
+  map.getPane("radar").style.pointerEvents = "none";
+  map.getPane("radar").classList.add("leaflet-radar-pane");
+  const RADAR = { pick: null, day: null, idx: null, imgs: [], overlay: null, base: "radar/" };
+  const radarInfo = L.control({ position: "bottomright" });
+  radarInfo.onAdd = () => { const d = L.DomUtil.create("div", "radar-time"); d.hidden = true; return d; };
+  radarInfo.addTo(map);
+  async function loadRadar(ci) {
+    if (RADAR.day === ci && RADAR.idx !== undefined) return RADAR.idx;
+    RADAR.day = ci; RADAR.idx = undefined;
+    const ev = C[ci].file.replace(/\.csv$/, "");
+    try {
+      const r = await fetch(`${RADAR.base}${ev}/index.json`, { cache: "no-cache" });
+      if (!r.ok) throw new Error(r.status);
+      const idx = await r.json();
+      if (RADAR.day !== ci) return null;
+      idx.dir = `${RADAR.base}${ev}/`;
+      RADAR.imgs = idx.frames.map((f) => { const im = new Image(); im.decoding = "async"; im.src = idx.dir + f.f; return im; });
+      RADAR.idx = idx;
+    } catch (err) { console.warn("radar index:", err); RADAR.idx = null; }
+    return RADAR.idx;
+  }
+  function radarFrame(idx, t) {
+    // last frame at or before t; none if t is more than one step past it
+    const fr = idx.frames;
+    let lo2 = 0, hi2 = fr.length - 1, k = -1;
+    while (lo2 <= hi2) { const m = (lo2 + hi2) >> 1; if (fr[m].t <= t) { k = m; lo2 = m + 1; } else hi2 = m - 1; }
+    return k >= 0 && t - fr[k].t <= idx.step_s ? k : -1;
+  }
+  function drawRadar() {
+    const box = radarInfo.getContainer();
+    const on = $("showRadar").checked && RADAR.pick != null && RADAR.day === RADAR.pick && RADAR.idx;
+    const k = on ? radarFrame(RADAR.idx, win[1]) : -1;
+    if (k < 0) {
+      if (RADAR.overlay) { map.removeLayer(RADAR.overlay); RADAR.overlay = null; }
+      box.hidden = !on;
+      if (on) box.innerHTML = `<span class="dim">Radar: no frame at ${fmtHM(win[1])} (storms not active)</span>`;
+      return;
+    }
+    const f = RADAR.idx.frames[k], url = RADAR.idx.dir + f.f;
+    if (!RADAR.overlay) RADAR.overlay = L.imageOverlay(url, f.b, { pane: "radar", opacity: 0.8, interactive: false }).addTo(map);
+    else if (RADAR.overlay._url !== url) { RADAR.overlay.setUrl(url); RADAR.overlay.setBounds(L.latLngBounds(f.b)); }
+    box.hidden = false;
+    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">UTC · ${f.radars.join(", ")}</span>`;
+  }
+  function radarUI() {
+    const ok = RADAR.pick != null;
+    $("showRadar").disabled = !ok;
+    if (!ok) $("showRadar").checked = false;
+    $("radarLbl").classList.toggle("is-off", !ok);
+    $("radarLbl").title = ok ? "Lowest-tilt (0.5°) reflectivity from the closest radar, within 50 km of the active storms, at the end of the time window" : "Pick a single day to show radar";
+    document.querySelector(".radar-key").hidden = !$("showRadar").checked;
+  }
+
   // ---- sounding card (hover tip + pinned, draggable windows) ----
   const envTip = document.createElement("div");
   envTip.className = "env-tip";
@@ -1189,6 +1247,7 @@
   function render({ fit = false } = {}) {
     const sel = select();
     drawMap(sel);
+    drawRadar();
     if (!$("panelEnv").hidden) renderEnvStats(sel);
     if (fit) fitToSelection(sel);
 
@@ -1422,6 +1481,9 @@
       return `<label class="sc-row"><input type="checkbox" data-si="${si}" checked><i style="background:var(${s.tornadic ? "--tor" : "--nontor"})"></i><b>${s.label}</b><span class="dim">${fmtHM(s.t0)}–${fmtHM(s.t1)}</span></label>`;
     }).join("");
     setScShow(null);
+    RADAR.pick = pickDay;
+    radarUI();
+    if ($("showRadar").checked) loadRadar(pickDay).then(() => drawRadar());
   }
   function scPanelOpen(open) { $("scPanel").hidden = !open; $("scBtn").setAttribute("aria-expanded", open); }
   $("scBtn").addEventListener("click", (e) => { e.stopPropagation(); scPanelOpen($("scPanel").hidden); });
@@ -1453,6 +1515,23 @@
     render();
   });
   ["warnSps", "warnSvr", "warnTor"].forEach((id) => $(id).addEventListener("change", () => { warnUI(); render(); }));
+  // Radar: off at load, only for a single picked day
+  $("showRadar").checked = false;
+  radarUI();
+  $("showRadar").addEventListener("change", async () => {
+    radarUI();
+    if ($("showRadar").checked && pickDay != null) await loadRadar(pickDay);
+    drawRadar();
+  });
+  // with radar on, the left/right arrow keys move the time window by one radar frame
+  document.addEventListener("keydown", (e) => {
+    if (!$("showRadar").checked || !RADAR.idx || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (!["ArrowLeft", "ArrowRight"].includes(e.key) || e.target.closest("input, select, textarea, .noUi-handle")) return;
+    e.preventDefault();
+    const d = (e.key === "ArrowRight" ? 1 : -1) * RADAR.idx.step_s;
+    setWindow(win[0] + d, win[1] + d);
+    checkPickDay();
+  });
   $("fitBtn").addEventListener("click", () => fitToSelection(select()));
 
   // theme

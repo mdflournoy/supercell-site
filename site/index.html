@@ -71,6 +71,7 @@
           <label><input type="checkbox" id="showTorM" checked> Tornadic mesos</label>
           <label><input type="checkbox" id="showPaths"> Tornado paths</label>
           <label title="HRRR inflow slices (40 km, 90°) at each top of the hour; hover one for its sounding"><input type="checkbox" id="showEnv"> Environments</label>
+          <label id="radarLbl" class="is-off" title="Pick a single day to show radar"><input type="checkbox" id="showRadar" disabled> Radar</label>
           <label title="NWS warnings and special weather statements issued for the tracked storms (polygons as issued)"><input type="checkbox" id="showWarn"> Warnings</label>
           <span class="nws-sub" id="nwsSub" hidden>
             <label title="Special weather statements (SPS)"><input type="checkbox" id="warnSps"> Statements</label>
@@ -85,6 +86,7 @@
         <span class="key"><span class="sw tor"></span>Tornadic mesocyclone</span>
         <span class="key"><span class="sw non"></span>Nontornadic mesocyclone</span>
         <span class="key"><span class="sw path"></span>Tornado path (segment width ~ intensity)</span>
+        <span class="key radar-key" hidden><span class="dbz-bar"></span><span class="dbz-lab">5</span><span class="dbz-lab">75 dBZ</span>&nbsp;0.5° reflectivity</span>
         <span class="key nws-key" data-k="TO" hidden><span class="box tor-w"></span>Tornado warning</span>
         <span class="key nws-key" data-k="SV" hidden><span class="box svr-w"></span>Severe thunderstorm warning</span>
         <span class="key nws-key" data-k="SPS" hidden><span class="box sps-w"></span>Special weather statement</span>

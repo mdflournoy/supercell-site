@@ -104,6 +104,18 @@ jobs:
             git pull --rebase origin main && git push origin HEAD:main
           fi
 
+      - name: Radar loops from the radar-frames release (built by radar-frames.yml) -> site/radar/
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p site/radar radar-tars
+          if gh release view radar-frames -R ${{ github.repository }} >/dev/null 2>&1; then
+            gh release download radar-frames -R ${{ github.repository }} -p 'radar_*.tar' -D radar-tars --clobber
+            for f in radar-tars/radar_*.tar; do tar -xf "$f" -C site/radar; done
+          fi
+          du -sh site site/radar
+
       - name: Cache-bust app.js / style.css so browsers pick up new code
         run: sed -i "s/app\.js\"/app.js?v=${GITHUB_SHA::7}\"/; s/style\.css\"/style.css?v=${GITHUB_SHA::7}\"/" site/index.html
 
