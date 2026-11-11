@@ -455,27 +455,31 @@
     return RADAR.idx;
   }
   function radarFrame(idx, t) {
-    // last frame at or before t; none if t is more than one step past it
+    // last frame at or before t (none if t is more than one step past it, i.e. no storm active then);
+    // before the first / after the last frame, the first / last frame
     const fr = idx.frames;
+    if (!fr.length) return { k: -1 };
+    if (t < fr[0].t) return { k: 0, edge: "first" };
+    if (t >= fr[fr.length - 1].t) return { k: fr.length - 1, edge: t - fr[fr.length - 1].t > idx.step_s ? "last" : null };
     let lo2 = 0, hi2 = fr.length - 1, k = -1;
     while (lo2 <= hi2) { const m = (lo2 + hi2) >> 1; if (fr[m].t <= t) { k = m; lo2 = m + 1; } else hi2 = m - 1; }
-    return k >= 0 && t - fr[k].t <= idx.step_s ? k : -1;
+    return { k: t - fr[k].t <= idx.step_s ? k : -1 };
   }
   function drawRadar() {
     const box = radarInfo.getContainer();
     const on = $("showRadar").checked && RADAR.pick != null && RADAR.day === RADAR.pick && RADAR.idx;
-    const k = on ? radarFrame(RADAR.idx, win[1]) : -1;
+    const { k, edge } = on ? radarFrame(RADAR.idx, win[1]) : { k: -1 };
     if (k < 0) {
       if (RADAR.overlay) { map.removeLayer(RADAR.overlay); RADAR.overlay = null; }
       box.hidden = !on;
-      if (on) box.innerHTML = `<span class="dim">Radar: no frame at ${fmtHM(win[1])} (storms not active)</span>`;
+      if (on) box.innerHTML = `<span class="dim">Radar: no tracked storm active at ${fmtHM(win[1])}</span>`;
       return;
     }
     const f = RADAR.idx.frames[k], url = RADAR.idx.dir + f.f;
     if (!RADAR.overlay) RADAR.overlay = L.imageOverlay(url, f.b, { pane: "radar", opacity: 0.8, interactive: false }).addTo(map);
     else if (RADAR.overlay._url !== url) { RADAR.overlay.setUrl(url); RADAR.overlay.setBounds(L.latLngBounds(f.b)); }
     box.hidden = false;
-    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">· ${f.radars.join(", ")}</span>`;
+    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">· ${f.radars.join(", ")}${edge ? ` · ${edge} frame of the day` : ""}</span>`;
   }
   function radarUI() {
     const ok = RADAR.pick != null;
