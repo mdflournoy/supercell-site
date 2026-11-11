@@ -127,6 +127,7 @@ date,file,old_supercell,old_meso,new_supercell,new_meso,changed
 2022-03-08,20220308.csv,B,10,A,10,yes
 2022-03-08,20220308.csv,B,11,A,11,yes
 2022-03-08,20220308.csv,B,12,A,12,yes
+2022-03-08,20220308.csv,B,13,A,13,yes
 2022-03-08,20220308.csv,C,1,B,1,yes
 2022-03-08,20220308.csv,C,2,B,2,yes
 2022-03-08,20220308.csv,C,3,B,3,yes
@@ -136,9 +137,6 @@ date,file,old_supercell,old_meso,new_supercell,new_meso,changed
 2022-03-08,20220308.csv,C,7,B,7,yes
 2022-03-08,20220308.csv,A,1,C,1,yes
 2022-03-09,20220309.csv,A,1,A,1,
-2022-03-09,20220309.csv,A,2,A,2,
-2022-03-09,20220309.csv,C,1,B,1,yes
-2022-03-09,20220309.csv,B,1,C,1,yes
 2022-03-15,20220315.csv,A,1,A,1,
 2022-03-15,20220315.csv,B,1,B,1,
 2022-03-16,20220316.csv,F,1,A,1,yes

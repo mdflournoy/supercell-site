@@ -1,4 +1,4 @@
-event_date=20220309,valid_time_utc=2022-03-09T13:00Z,meso_id=A2,lat=32.3116,lon=-84.3351
+event_date=20220308,valid_time_utc=2022-03-09T13:00Z,meso_id=A13,lat=32.3116,lon=-84.3351
 height_agl_m,pressure_hpa,temperature_c,dewpoint_c,u_ms,v_ms
 10.7,995.89,19.36,18.76,0.44,1.61
 39.8,992.92,19.67,18.98,2.05,4.46
