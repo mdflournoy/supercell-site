@@ -63,6 +63,7 @@
   const tMin = Math.min(...S.map((s) => s.t0)), tMax = Math.max(...S.map((s) => s.t1));
   const H = 3600, lo = Math.floor(tMin / H) * H, hi = Math.ceil(tMax / H) * H;
   let win = [lo, hi];
+  let dayOnly = null; // case index while a single day is picked: only that day's storms are shown
 
   // header + notices
   const gen = new Date(D.generated);
@@ -1254,9 +1255,13 @@
 
   function select() {
     const [a, b] = win;
-    const scs = S.filter((s) => s.t0 <= b && s.t1 >= a);
+    // a picked day shows only its own storms: a long-lived supercell can run past 12Z into the next
+    // day's file (and that day's window), which would otherwise mix the two days
+    const scs = S.filter((s) => s.t0 <= b && s.t1 >= a && (dayOnly == null || s.case === dayOnly));
     const mesos = scs.flatMap((s) => s.mesos).filter((mi) => M[mi].t0 <= b && M[mi].t1 >= a);
-    const paths = T.filter((t) => t.ncei && t.drawn.length && t.t0 <= b && t.t1 >= a).map((t) => t.i);
+    const dayM = dayOnly == null ? null : new Set((scByDay[dayOnly] || []).flatMap((si) => S[si].mesos));
+    const paths = T.filter((t) => t.ncei && t.drawn.length && t.t0 <= b && t.t1 >= a
+      && (dayM == null || !t.mesos.length || t.mesos.some((mi) => dayM.has(mi)))).map((t) => t.i);
     return { scs, mesos, paths };
   }
 
@@ -1490,6 +1495,7 @@
   }
   function setPickDay(ci) {
     pickDay = ci == null || ci === "" ? null : +ci;
+    dayOnly = pickDay;
     $("scPick").hidden = pickDay == null;
     scPanelOpen(false);
     $("scList").innerHTML = pickDay == null ? "" : (scByDay[pickDay] || []).map((si) => {
