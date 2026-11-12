@@ -35,12 +35,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "ml"))
 
-VERSION = 1             # bump to rebuild every loop after a change to how frames are made
+VERSION = 2             # bump to rebuild every loop after a change to how frames are made
 STEP_S = 300
 PAD_S = 1800            # frames from 30 min before the first to 30 min after the last track point
 ACTIVE_PAD_S = 600      # a meso counts as active from 10 min before its first to 10 min after its last point
 CROP_KM = 50.0
 DX_KM = 1.0
+N_RANK = 3              # if the closest radar has no sweep for a frame, the 2nd (then 3rd) closest fills in
 MAX_AGE_S = 720         # a sweep older than 12 min is not used
 SITE_SEARCH_KM = 460
 DBZ_MIN, DBZ_MAX = 5, 80
@@ -137,7 +138,7 @@ def plan(mesos: list[np.ndarray], sites: pd.DataFrame):
             mask |= km(pla, plo, la, lo) <= CROP_KM
         la_m, lo_m = la[mask], lo[mask]
         d = km(la_m[:, None], lo_m[:, None], st.lat.to_numpy()[None], st.lon.to_numpy()[None])
-        near_site = np.argmin(d, axis=1)
+        near_site = np.argsort(d, axis=1)[:, :N_RANK]             # closest, 2nd, 3rd closest radar
         frames.append({"i": i, "t": float(t), "c0": c0, "c1": c1, "r0": r0, "r1": r1,
                        "shape": mask.shape, "site": near_site, "lat": la_m, "lon": lo_m,
                        "flat_rows": np.nonzero(mask)})
@@ -244,6 +245,31 @@ def _init():
     os.environ["OMP_NUM_THREADS"] = "1"
 
 
+def outline(rows, cols, r0, c0, dx, tol_px=1.0):
+    """Boundary of a set of frame pixels as [[[lat, lon], ...], ...] rings (exterior and holes), simplified."""
+    from shapely.geometry import box
+    from shapely.ops import unary_union
+    boxes = []
+    order = np.lexsort((cols, rows))
+    rows, cols = rows[order], cols[order]
+    start = 0
+    for i in range(1, len(rows) + 1):                 # merge each row's runs of pixels into one box
+        if i == len(rows) or rows[i] != rows[start] or cols[i] != cols[i - 1] + 1:
+            boxes.append(box(cols[start], rows[start], cols[i - 1] + 1, rows[start] + 1))
+            start = i
+    geom = unary_union(boxes).simplify(tol_px)
+    polys = list(geom.geoms) if hasattr(geom, "geoms") else [geom]
+    out = []
+    for p in polys:
+        if p.is_empty or p.area < 4:                   # ignore specks under ~4 km^2
+            continue
+        for ring in [p.exterior, *p.interiors]:
+            xy = np.asarray(ring.coords)
+            la, lo = unmerc((xy[:, 0] + c0) * dx, (xy[:, 1] + r0) * dx)
+            out.append([[round(float(a), 3), round(float(b), 3)] for a, b in zip(la, lo)])
+    return out
+
+
 # ---------------------------------------------------------------- what needs (re)building
 def fingerprint(path: Path) -> str | None:
     """Hash of the track points (time, position) and VERSION: only these change the frames."""
@@ -290,33 +316,57 @@ def main() -> None:
     sites = sites[sites.site.str.startswith("K")]
     ts, frames, st, dx = plan(mesos, sites)
     print(f"{a.event}: {len(mesos)} mesos, {len(frames)} frames, {sum(len(f['lat']) for f in frames) / 1e6:.2f} M pixels, "
-          f"{len({s for f in frames for s in np.unique(f['site'])})} radars", flush=True)
-    jobs = {}
-    for k, f in enumerate(frames):
-        for si in np.unique(f["site"]):
-            sel = f["site"] == si
-            jobs.setdefault(si, []).append((k, f["t"], f["lat"][sel], f["lon"][sel]))
-    res = {}
-    with ProcessPoolExecutor(a.workers, initializer=_init) as ex:
-        for site, out, log in ex.map(radar_job, [(st.site[si], st.lat[si], st.lon[si], n) for si, n in jobs.items()]):
-            res[site] = out
-            print(" ", log, flush=True)
+          f"{len({s for f in frames for s in np.unique(f['site'][:, 0])})} radars", flush=True)
+    # Fill each pixel from its closest radar; where that radar has no usable sweep for the frame (missing from
+    # the archive, a download failure, or older than MAX_AGE_S), from the next closest; up to N_RANK radars.
+    for f in frames:
+        f["lvl"] = np.zeros(len(f["lat"]), np.int8)
+        f["code"] = np.zeros(len(f["lat"]), np.uint8)
+        f["done"] = np.zeros(len(f["lat"]), bool)
+        f["sweep_t"] = {}
+    failed: set = set()
+    n_pass = 0
+    while True:
+        jobs = {}
+        for k, f in enumerate(frames):
+            while True:                                   # move pixels off radars known to have nothing for k
+                cur = f["site"][np.arange(len(f["lvl"])), f["lvl"]]
+                bad = ~f["done"] & np.array([(int(si), k) in failed for si in cur]) if len(cur) else np.zeros(0, bool)
+                if not bad.any():
+                    break
+                last = bad & (f["lvl"] >= N_RANK - 1)
+                f["done"][last] = True                    # no radar at all: stays transparent
+                f["lvl"][bad & ~last] += 1
+            todo = ~f["done"]
+            for si in np.unique(cur[todo]):
+                sel = np.flatnonzero(todo & (cur == si))
+                jobs.setdefault(int(si), []).append((k, f["t"], f["lat"][sel], f["lon"][sel], sel))
+        if not jobs:
+            break
+        n_pass += 1
+        if n_pass > 1:
+            print(f" pass {n_pass} (fallback to the next closest radar): {sum(len(v) for v in jobs.values())} radar-frames", flush=True)
+        with ProcessPoolExecutor(a.workers, initializer=_init) as ex:
+            args = [(st.site[si], st.lat[si], st.lon[si], [n[:4] for n in need]) for si, need in jobs.items()]
+            for (si, need), (site, out, log) in zip(jobs.items(), ex.map(radar_job, args)):
+                print(" ", log, flush=True)
+                for k, _, _, _, sel in need:
+                    r = out.get(k)
+                    if r is None:
+                        failed.add((si, k))
+                        continue
+                    f = frames[k]
+                    f["code"][sel] = r[0]; f["done"][sel] = True
+                    f["sweep_t"][site] = r[1]
     out_dir = Path(a.out) / a.event
     out_dir.mkdir(parents=True, exist_ok=True)
     pal = palette()
-    idx, total = [], 0
+    idx, total, n_fill = [], 0, 0
     for k, f in enumerate(frames):
         h, w = f["shape"]
         img = np.zeros((h, w), np.uint8)
         rows, cols = f["flat_rows"]
-        ages, used = [], []
-        for si in np.unique(f["site"]):
-            r = res.get(st.site[si], {}).get(k)
-            if r is None:
-                continue
-            sel = f["site"] == si
-            img[rows[sel], cols[sel]] = r[0]
-            ages.append(f["t"] - r[1]); used.append(st.site[si])
+        img[rows, cols] = f["code"]
         im = Image.fromarray(img[::-1], "P")                     # row 0 = north
         im.putpalette(pal)
         name = f"{int(f['t'])}.png"
@@ -326,8 +376,21 @@ def main() -> None:
         x0, x1, y0, y1 = f["c0"] * dx, f["c1"] * dx, f["r0"] * dx, f["r1"] * dx
         s_, w_ = (float(v) for v in unmerc(x0, y0))
         n_, e_ = (float(v) for v in unmerc(x1, y1))
-        idx.append({"t": int(f["t"]), "f": name, "b": [[round(s_, 5), round(w_, 5)], [round(n_, 5), round(e_, 5)]],
-                    "radars": used, "age_s": int(max(ages)) if ages else None, "px": int(len(f["lat"])), "bytes": size})
+        used = sorted(f["sweep_t"])
+        rec = {"t": int(f["t"]), "f": name, "b": [[round(s_, 5), round(w_, 5)], [round(n_, 5), round(e_, 5)]],
+               "radars": used, "age_s": int(max(f["t"] - v for v in f["sweep_t"].values())) if used else None,
+               "px": int(len(f["lat"])), "bytes": size}
+        # where a radar other than the closest was used: outline (lat/lon rings) and which radars stood in
+        fb = f["done"] & (f["lvl"] > 0)
+        if fb.any():
+            n_fill += 1
+            sub = f["site"][np.arange(len(f["lvl"])), f["lvl"]]
+            rec["missing"] = sorted({st.site[int(si)] for si in f["site"][fb, 0]})
+            rec["fill_by"] = sorted({st.site[int(si)] for si in sub[fb]})
+            rec["fill"] = outline(rows[fb], cols[fb], f["r0"], f["c0"], dx)
+        idx.append(rec)
+    if n_fill:
+        print(f" {n_fill} frames use a farther radar where the closest had no data", flush=True)
     (out_dir / "index.json").write_text(json.dumps({"event": a.event, "step_s": STEP_S, "crop_km": CROP_KM, "dx_km": DX_KM,
                                                      "dbz_min": DBZ_MIN, "frames": idx}, separators=(",", ":")))
     px = sum(f["px"] for f in idx)

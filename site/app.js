@@ -436,7 +436,9 @@
   map.createPane("radar").style.zIndex = 340; // above the basemap, below place labels and tracks
   map.getPane("radar").style.pointerEvents = "none";
   map.getPane("radar").classList.add("leaflet-radar-pane");
-  const RADAR = { pick: null, day: null, idx: null, imgs: [], overlay: null, base: "radar/" };
+  const RADAR = { pick: null, day: null, idx: null, imgs: [], overlay: null, base: "radar/", fillK: -1 };
+  // dashed firebrick outline where the closest radar had no data and a farther one filled in
+  const radarFill = L.layerGroup().addTo(map);
   const radarInfo = L.control({ position: "bottomright" });
   radarInfo.onAdd = () => { const d = L.DomUtil.create("div", "radar-time"); d.hidden = true; return d; };
   radarInfo.addTo(map);
@@ -452,7 +454,7 @@
   let hintEnd = null;
   async function loadRadar(ci) {
     if (RADAR.day === ci && RADAR.idx !== undefined) return RADAR.idx;
-    RADAR.day = ci; RADAR.idx = undefined;
+    RADAR.day = ci; RADAR.idx = undefined; RADAR.fillK = -1;
     const ev = C[ci].file.replace(/\.csv$/, "");
     try {
       const r = await fetch(`${RADAR.base}${ev}/index.json`, { cache: "no-cache" });
@@ -484,6 +486,7 @@
     const { k, edge } = on ? radarFrame(RADAR.idx, win[1]) : { k: -1 };
     if (k < 0) {
       if (RADAR.overlay) { map.removeLayer(RADAR.overlay); RADAR.overlay = null; }
+      radarFill.clearLayers(); RADAR.fillK = -1;
       box.hidden = !on;
       if (on) box.innerHTML = `<span class="dim">Radar: no tracked storm active at ${fmtHM(win[1])}</span>`;
       return;
@@ -491,8 +494,13 @@
     const f = RADAR.idx.frames[k], url = RADAR.idx.dir + f.f;
     if (!RADAR.overlay) RADAR.overlay = L.imageOverlay(url, f.b, { pane: "radar", opacity: 0.8, interactive: false }).addTo(map);
     else if (RADAR.overlay._url !== url) { RADAR.overlay.setUrl(url); RADAR.overlay.setBounds(L.latLngBounds(f.b)); }
+    if (RADAR.fillK !== k) {
+      radarFill.clearLayers(); RADAR.fillK = k;
+      (f.fill || []).forEach((ring) => L.polyline(ring, { renderer, color: "firebrick", weight: 2, dashArray: "6 5", opacity: 0.95, interactive: false }).addTo(radarFill));
+    }
     box.hidden = false;
-    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">· ${f.radars.join(", ")}${edge ? ` · ${edge} frame of the day` : ""}</span>`;
+    const gap = f.missing ? `<br><span style="color:firebrick">- - -</span> <span class="dim">no data from ${f.missing.join(", ")}: filled from ${f.fill_by.join(", ")}</span>` : "";
+    box.innerHTML = `0.5° reflectivity <b>${fmtHM(f.t)}</b> <span class="dim">· ${f.radars.join(", ")}${edge ? ` · ${edge} frame of the day` : ""}</span>${gap}`;
   }
   function radarUI() {
     const ok = RADAR.pick != null;

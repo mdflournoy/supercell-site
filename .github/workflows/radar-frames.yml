@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install numpy pandas requests pillow arm_pyart
+      - run: pip install numpy pandas requests pillow arm_pyart shapely
       - name: Build frames
         run: python scripts/radar_frames.py --event ${{ matrix.job.event }} --tracks tracks --out radar --workers 4
       - name: Store in the radar-frames release

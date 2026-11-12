@@ -146,7 +146,8 @@ cd site && python -m http.server 8000      # open http://localhost:8000
   from the closest radar, within 50 km of the storms active at the time, every 5 min. The frame shown is
   the one at the **end** of the time window — drag the slider's right handle (or click the map and use
   ← →) to loop; a note at the top of the map says so when Radar is turned on. All of the day's frames load
-  at once so the loop steps instantly. The corner label gives the frame time and the radars used.
+  at once so the loop steps instantly. The corner label gives the frame time and the radars used. A
+  dashed firebrick outline marks where the closest radar had no data and a farther one filled in.
 - **Meso IDs on the map** (e.g. `A1`, in the track's color, at the start of each track) whenever the
   window spans about a day or less — e.g. after picking a day.
 - **Supercells** menu (left of "Jump to a day"): appears once a day is selected (dropdown or Days table)
@@ -210,7 +211,9 @@ resumes where it left off on the next run; `azshear-cache/status.json` summarize
 `scripts/radar_frames.py` builds, for each event, a loop of lowest-tilt (0.5°) reflectivity every 5 min
 from 30 min before the first to 30 min after the last track point. A frame covers only the ground within
 50 km of a mesocyclone active at that time; each ~1 km pixel takes the newest low sweep (SAILS included,
-at most 12 min old) of its closest NEXRAD, read from the Level II archive on AWS. Frames are paletted PNGs
+at most 12 min old) of its closest NEXRAD, read from the Level II archive on AWS. Where the closest radar
+has no usable sweep (missing from the archive, e.g. KMXX on 3/25/23), the 2nd, then 3rd closest fills in,
+and the map outlines that area with a dashed firebrick line and names the missing radar. Frames are paletted PNGs
 on a Web Mercator grid (1 dB steps from 5 dBZ). Each day is stored as `radar_<event>.tar` in the
 `radar-frames` release, not in the repository, and the site build unpacks them into `site/radar/`.
 
