@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observational Database of Supercells</title>
+<meta name="description" content="Supercell mesocyclone and tornado tracks in the Southeast U.S. from 2022–2023.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Observational Database of Supercells">
+<meta property="og:description" content="Supercell mesocyclone and tornado tracks in the Southeast U.S. from 2022–2023.">
+<meta property="og:url" content="https://mdflournoy.github.io/supercell-site/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Observational Database of Supercells">
+<meta name="twitter:description" content="Supercell mesocyclone and tornado tracks in the Southeast U.S. from 2022–2023.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 8h20M8 13h16M11 18h10M13 23h6M15 27h2' stroke='%232a78d6' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="globe-mode">
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1>Observational Database of Supercells</h1>
+      <span class="sub" id="updated">Loading…</span>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn ghost" id="themeBtn" title="Toggle light/dark" aria-label="Toggle light/dark theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="filters" aria-label="Time window">
+    <div class="label">Time window</div>
+    <div class="range-inputs">
+      <input type="datetime-local" id="tStart" step="60" aria-label="Window start (UTC)">
+      <span>→</span>
+      <input type="datetime-local" id="tEnd" step="60" aria-label="Window end (UTC)">
+      <span class="utc">UTC</span>
+    </div>
+    <div class="presets">
+      <div class="sc-pick" id="scPick" hidden>
+        <button id="scBtn" aria-haspopup="true" aria-expanded="false" aria-controls="scPanel">Supercells: all <span aria-hidden="true">▾</span></button>
+        <div class="sc-panel" id="scPanel" hidden>
+          <div class="sc-panel-head"><button id="scNone">Remove all</button><button id="scAll">Show all</button></div>
+          <div class="sc-list" id="scList"></div>
+        </div>
+      </div>
+      <select id="daySelect" aria-label="Jump to a day"><option value="">Jump to a day…</option></select>
+      <select id="yearSelect" aria-label="Year"><option value="">Year…</option></select>
+      <button id="allBtn">All days</button>
+    </div>
+    <div class="slider-row">
+      <div id="slider"></div>
+      <div class="slider-scale"><span id="scaleMin"></span><span id="scaleMax"></span></div>
+    </div>
+    <div class="window-note" id="windowNote"></div>
+  </section>
+
+  <div class="warn" id="ncei-warn"></div>
+
+  <section class="grid-main">
+    <div class="card map-card">
+      <div class="map-head">
+        <h2 style="margin:0">Mesocyclone tracks &amp; tornadoes <span class="globe-badge">Globe preview · <a href="./">standard map</a></span></h2>
+        <div class="toggles">
+          <label><input type="checkbox" id="showNon" checked> Nontornadic mesos</label>
+          <label><input type="checkbox" id="showTorM" checked> Tornadic mesos</label>
+          <label><input type="checkbox" id="showPaths"> Tornado paths</label>
+          <label title="HRRR inflow slices (40 km, 90°) at each top of the hour; hover one for its sounding"><input type="checkbox" id="showEnv"> Environments</label>
+          <label id="radarLbl" class="is-off" title="Pick a single day to show radar"><input type="checkbox" id="showRadar" disabled> Radar</label>
+          <label title="NWS warnings and special weather statements issued for the tracked storms (polygons as issued)"><input type="checkbox" id="showWarn"> Warnings</label>
+          <span class="nws-sub" id="nwsSub" hidden>
+            <label title="Special weather statements (SPS)"><input type="checkbox" id="warnSps"> Statements</label>
+            <label title="Severe thunderstorm warnings"><input type="checkbox" id="warnSvr" checked> Severe</label>
+            <label title="Tornado warnings"><input type="checkbox" id="warnTor" checked> Tornado</label>
+          </span>
+          <button id="fitBtn" style="padding:4px 10px">Zoom to tracks</button>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="legend">
+        <span class="key"><span class="sw tor"></span>Tornadic mesocyclone</span>
+        <span class="key"><span class="sw non"></span>Nontornadic mesocyclone</span>
+        <span class="key"><span class="sw path"></span>Tornado path (segment width ~ intensity)</span>
+        <span class="key radar-key" hidden><span class="dbz-bar"></span><span class="dbz-lab">5</span><span class="dbz-lab">75 dBZ</span>&nbsp;0.5° reflectivity</span>
+        <span class="key nws-key" data-k="TO" hidden><span class="box tor-w"></span>Tornado warning</span>
+        <span class="key nws-key" data-k="SV" hidden><span class="box svr-w"></span>Severe thunderstorm warning</span>
+        <span class="key nws-key" data-k="SPS" hidden><span class="box sps-w"></span>Special weather statement</span>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="kpis" id="kpis"></div>
+      <div class="card">
+        <div class="donuts">
+          <div class="donut-row">
+            <div class="donut-box"><canvas id="pieSc"></canvas><div class="donut-center" id="pieScC"></div></div>
+            <div class="donut-text" id="pieScT"></div>
+          </div>
+          <div class="donut-row">
+            <div class="donut-box"><canvas id="pieMeso"></canvas><div class="donut-center" id="pieMesoC"></div></div>
+            <div class="donut-text" id="pieMesoT"></div>
+          </div>
+          <div class="donut-row">
+            <div class="donut-box"><canvas id="pieMesoTs"></canvas><div class="donut-center" id="pieMesoTsC"></div></div>
+            <div class="donut-text" id="pieMesoTsT"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="stat-tabs">
+    <div class="stat-tabs-head">
+      <div class="tabs big-tabs" role="tablist" aria-label="Statistics">
+        <button role="tab" id="tabGeneral" aria-selected="true" aria-controls="panelGeneral">General stats</button>
+        <button role="tab" id="tabEnv" aria-selected="false" aria-controls="panelEnv">Environments</button>
+      </div>
+      <div class="env-controls" id="envControls" hidden>
+        <label>Times
+          <select id="envSubset">
+            <option value="all">All</option>
+            <option value="initial">Initial</option>
+            <option value="strongest">Strongest</option>
+          </select>
+        </label>
+        <label class="strongest-opt" hidden>Nontornadic peak
+          <select id="envPeakNon">
+            <option value="lo">Low-level AzShear</option>
+            <option value="mid">Mid-level AzShear</option>
+          </select>
+        </label>
+        <label class="strongest-opt" hidden>Tornadic peak
+          <select id="envPeakTor">
+            <option value="tor">Strongest tornado</option>
+            <option value="lo">Low-level AzShear</option>
+            <option value="mid">Mid-level AzShear</option>
+          </select>
+        </label>
+        <label>Tornadic by
+          <select id="envClass">
+            <option value="sc">Supercell</option>
+            <option value="meso">Mesocyclone</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="stat-panel" id="panelGeneral" role="tabpanel" aria-labelledby="tabGeneral">
+    <section class="grid-charts">
+      <div class="card">
+        <h2>Mesocyclones per supercell</h2>
+        <p class="hint" id="mpcHint"></p>
+        <div class="chart-box"><canvas id="histMeso"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Mesocyclone lifetime</h2>
+        <p class="hint" id="lifeHint"></p>
+        <div class="chart-box"><canvas id="histLife"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Supercell dissipation mode</h2>
+        <p class="hint">Supercell count by how the storm ended</p>
+        <div class="chart-box"><canvas id="barEnd"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid-bottom">
+      <div class="card">
+        <h2>Tornado ratings</h2>
+        <p class="hint">Maximum segment rating along each track</p>
+        <div class="chart-box"><canvas id="barEF"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Time from track start to first tornado</h2>
+        <p class="hint" id="ttHint"></p>
+        <div class="chart-box"><canvas id="histTT"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Days</h2>
+            <p class="hint">Click a day to set the window and zoom the map</p>
+          </div>
+          <button id="allBtn2">All days</button>
+        </div>
+        <div class="table-wrap">
+          <table class="days">
+            <thead><tr>
+              <th data-k="date">Date</th><th data-k="sc">Supercells</th><th data-k="tsc">Tornadic</th>
+              <th data-k="m">Mesos</th><th data-k="tor">Tornadoes</th><th data-k="maxef">Max EF</th>
+            </tr></thead>
+            <tbody id="dayRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-pair">
+      <div class="card">
+        <h2>Tornadoes per supercell</h2>
+        <p class="hint" id="tpsHint"></p>
+        <div class="chart-box"><canvas id="histTPS"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Tornadoes per mesocyclone</h2>
+        <p class="hint" id="tpmHint"></p>
+        <div class="chart-box"><canvas id="histTPM"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Tornado chronology</h2>
+            <p class="hint" id="chronoHint"></p>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Chronology view">
+            <button role="tab" id="tabIntensity" aria-selected="true">Intensity</button>
+            <button role="tab" id="tabOrder" aria-selected="false">Order</button>
+          </div>
+        </div>
+        <div class="order-grid" id="orderGrid"></div>
+        <div class="order-grid by-order" id="orderGrid2" hidden></div>
+        <div class="order-legend" id="orderLegend"></div>
+      </div>
+    </section>
+    </div>
+    <div class="stat-panel" id="panelEnv" role="tabpanel" aria-labelledby="tabEnv" hidden>
+      <p class="env-note" id="envNote"></p>
+      <div class="grid-violins" id="violins"></div>
+    </div>
+  </section>
+
+  <footer>
+    <span id="foot"></span>
+    <span>Tornado data: 1950–2024 tornado database (segments joined by oneTorID), <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">NCEI Storm Events</a> for newer events · Basemap © OpenFreeMap, © OpenMapTiles, © OpenStreetMap contributors</span>
+  </footer>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="lgl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -109,8 +109,20 @@
   }
   const webgl = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch (_) { return false; } })();
   let gl = null, vectorOK = !!(window.maplibregl && L.maplibreGL && webgl), tiles = [];
+  const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
   async function setTiles() {
     const dark = isDark();
+    if (L.isGL) { // globe preview (globe.html + lgl.js): the whole map is MapLibre
+      try { map.setBasemap(await vectorStyle(dark), OFM_ATTR); }
+      catch (e) {
+        console.warn("Vector basemap unavailable; using raster tiles.", e);
+        const v = dark ? "Dark" : "Light", src = (n) => ({ type: "raster", tileSize: 256, maxzoom: 16, tiles: [`${ESRI}World_${v}_Gray_${n}/MapServer/tile/{z}/{y}/{x}`] });
+        map.setBasemap({ version: 8, sources: { b: src("Base"), r: src("Reference") },
+          layers: [{ id: "bg", type: "background", paint: { "background-color": dark ? "#262624" : "#e9e8e4" } }, { id: "b", type: "raster", source: "b" }, { id: "r", type: "raster", source: "r", paint: { "raster-opacity": 0.9 } }] },
+        "Basemap &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors");
+      }
+      return;
+    }
     if (vectorOK) {
       try {
         const style = await vectorStyle(dark);
@@ -129,7 +141,6 @@
     }
     setRasterTiles();
   }
-  const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
   function setRasterTiles() {
     tiles.forEach((t) => map.removeLayer(t));
     const v = isDark() ? "Dark" : "Light";

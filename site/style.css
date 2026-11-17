@@ -368,3 +368,24 @@ footer a { color: var(--ink-2); }
 @media (max-width: 900px) { .grid-violins { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .grid-violins { grid-template-columns: 1fr; } .stat-panel { padding: 0 8px 8px; } }
 .violin-card h2 .unit { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+/* ---- globe preview (globe.html + lgl.js: the map drawn by MapLibre on a globe) */
+.globe-badge { margin-left: 10px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.globe-badge a { color: var(--accent); }
+.globe-mode #map { background: #0b1324; position: relative; }
+.globe-mode .maplibregl-map { font: inherit; }
+.lgl-tip { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 5; white-space: nowrap; }
+.lgl-tip[hidden] { display: none; }
+.lgl-popup .maplibregl-popup-content {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 14px; font-size: 13px; min-width: 240px;
+}
+.lgl-popup .maplibregl-popup-tip { display: none; }
+.lgl-popup .maplibregl-popup-close-button { color: var(--muted); font-size: 18px; padding: 0 6px; }
+.globe-mode .maplibregl-ctrl-scale {
+  border: 1.5px solid var(--muted); border-top: 1.5px solid var(--muted); background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--ink-2); font-size: 11px; line-height: 1.4; padding: 1px 6px; border-radius: 3px; margin-bottom: 3px !important;
+}
+.globe-mode .maplibregl-ctrl-attrib { background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--ink-2); font-size: 11px; }
+.globe-mode .maplibregl-ctrl-attrib a { color: var(--ink-2); }
+.globe-mode .lgl-ctrl.radar-time { margin: 0 10px 6px 0; }
