@@ -117,7 +117,7 @@ jobs:
           du -sh site site/radar
 
       - name: Cache-bust app.js / style.css so browsers pick up new code
-        run: sed -i "s/app\.js\"/app.js?v=${GITHUB_SHA::7}\"/; s/style\.css\"/style.css?v=${GITHUB_SHA::7}\"/; s/lgl\.js\"/lgl.js?v=${GITHUB_SHA::7}\"/" site/index.html site/globe.html
+        run: sed -i "s/app\.js\"/app.js?v=${GITHUB_SHA::7}\"/; s/style\.css\"/style.css?v=${GITHUB_SHA::7}\"/; s/lgl\.js\"/lgl.js?v=${GITHUB_SHA::7}\"/" site/index.html site/flat.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

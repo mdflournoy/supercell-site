@@ -97,7 +97,7 @@ cd site && python -m http.server 8000      # open http://localhost:8000
 
 ## Dashboard features
 
-- Pan/zoom map (Leaflet + OpenFreeMap vector basemap with state/county lines; sharp on high-DPI screens). Nontornadic mesos are blue, tornadic mesos red,
+- Pan/zoom map on a 3D globe (MapLibre GL with the OpenFreeMap vector basemap and state/county lines; `site/lgl.js` adapts the Leaflet-style drawing code in `app.js` to MapLibre). `flat.html` is the same page on a flat Leaflet map, used automatically when a browser has no WebGL; `globe.html` redirects to the main page. Nontornadic mesos are blue, tornadic mesos red,
   and NCEI tornado paths are drawn in black with width scaled by EF. Hover a track to see
   its whole supercell; click any track or path for details and a link to the NCEI event.
 - Time window: a dual-handle slider, exact UTC start/end inputs, "Jump to a day", a year

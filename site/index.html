@@ -13,12 +13,12 @@
 <meta name="twitter:title" content="Observational Database of Supercells">
 <meta name="twitter:description" content="Supercell mesocyclone and tornado tracks in the Southeast U.S. from 2022–2023.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 8h20M8 13h16M11 18h10M13 23h6M15 27h2' stroke='%232a78d6' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css">
 <link rel="stylesheet" href="style.css">
+<script>(() => { try { const c = document.createElement("canvas"); if (!(c.getContext("webgl2") || c.getContext("webgl"))) location.replace("flat.html" + location.hash); } catch (_) { location.replace("flat.html" + location.hash); } })();</script>
 </head>
-<body>
+<body class="globe-mode">
 <div class="wrap">
 
   <header class="top">
@@ -65,7 +65,7 @@
   <section class="grid-main">
     <div class="card map-card">
       <div class="map-head">
-        <h2 style="margin:0">Mesocyclone tracks &amp; tornadoes</h2>
+        <h2 style="margin:0">Mesocyclone tracks &amp; tornadoes <span class="globe-badge"><a href="flat.html" title="The same map on a flat (Web Mercator) projection">flat map</a></span></h2>
         <div class="toggles">
           <label><input type="checkbox" id="showNon" checked> Nontornadic mesos</label>
           <label><input type="checkbox" id="showTorM" checked> Tornadic mesos</label>
@@ -239,9 +239,8 @@
   </footer>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
+<script src="lgl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
 <script src="app.js"></script>
