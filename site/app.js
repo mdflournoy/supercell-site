@@ -285,9 +285,12 @@
     }
 
     // a dot where each environment slice's apex sits on its parent track (drawn above the tracks)
-    for (const [e, c] of envDots) {
+    envDots.sort((x, y) => x[2] - y[2]); // pinned dots last, on top
+    for (const [e, c, pinned] of envDots) {
       const m = M[e.m];
-      const dot = L.circleMarker([e.lat, e.lon], { renderer, radius: 4, color: css("--surface"), weight: 1.5, fillColor: c, fillOpacity: 1, _r: 4 });
+      const dot = pinned
+        ? L.circleMarker([e.lat, e.lon], { renderer, radius: 8, color: css("--ink"), weight: 3, fillColor: c, fillOpacity: 1, _r: 8 })
+        : L.circleMarker([e.lat, e.lon], { renderer, radius: 4, color: css("--surface"), weight: 1.5, fillColor: c, fillOpacity: 1, _r: 4 });
       dot.on("mouseover", (ev) => { highlight(m.sc, true); showEnvTip(e, ev.originalEvent); })
         .on("mousemove", (ev) => placeEnvTip(ev.originalEvent))
         .on("mouseout", () => { highlight(m.sc, false); hideEnvTip(); })
@@ -359,19 +362,27 @@
     return pts;
   }
   let envDots = [];
+  // soundings currently shown in pinned windows (record -> number of windows showing it): their slice and dot
+  // are drawn on top, larger and bolder, so it is obvious where the pinned sounding is from
+  const envPinned = new Map();
+  const pinShow = (e, d) => {
+    const n = (envPinned.get(e) || 0) + d;
+    if (n > 0) envPinned.set(e, n); else envPinned.delete(e);
+  };
   function drawEnv(sel, a, b, showNon, showTor, torC, nonC) {
     const want = new Set(sel.mesos);
-    const recs = ENV.filter((e) => want.has(e.m) && e.t >= a - 1800 && e.t <= b + 1800 && e.dir != null)
-      .sort((x, y) => M[x.m].tornadic - M[y.m].tornadic);
+    const recs = ENV.filter((e) => e.dir != null && (envPinned.has(e) || (want.has(e.m) && e.t >= a - 1800 && e.t <= b + 1800)))
+      .sort((x, y) => envPinned.has(x) - envPinned.has(y) || M[x.m].tornadic - M[y.m].tornadic);
     for (const e of recs) {
-      const m = M[e.m];
-      if (m.tornadic ? !showTor : !showNon) continue;
-      if (scShow && !scShow.has(m.sc)) continue;
+      const m = M[e.m], pinned = envPinned.has(e);
+      if (!pinned && (m.tornadic ? !showTor : !showNon)) continue;
+      if (!pinned && scShow && !scShow.has(m.sc)) continue;
       const c = m.tornadic ? torC : nonC;
-      const poly = L.polygon(wedge(e.lat, e.lon, e.dir), { renderer, color: c, weight: 1.25, opacity: 0.9, fillColor: c, fillOpacity: 0.3, _w: 1.25 });
-      envDots.push([e, c]);
-      const on = (ev) => { poly.setStyle({ weight: 3, fillOpacity: 0.45 }); highlight(m.sc, true); showEnvTip(e, ev.originalEvent); };
-      const off = () => { poly.setStyle({ weight: 1.25, fillOpacity: 0.3 }); highlight(m.sc, false); hideEnvTip(); };
+      const W0 = pinned ? 3.5 : 1.25, F0 = pinned ? 0.55 : 0.3;
+      const poly = L.polygon(wedge(e.lat, e.lon, e.dir), { renderer, color: c, weight: W0, opacity: pinned ? 1 : 0.9, fillColor: c, fillOpacity: F0, _w: W0 });
+      envDots.push([e, c, pinned]);
+      const on = (ev) => { poly.setStyle({ weight: pinned ? 4.5 : 3, fillOpacity: pinned ? 0.65 : 0.45 }); highlight(m.sc, true); showEnvTip(e, ev.originalEvent); };
+      const off = () => { poly.setStyle({ weight: W0, fillOpacity: F0 }); highlight(m.sc, false); hideEnvTip(); };
       poly.on("mouseover", on).on("mousemove", (ev) => placeEnvTip(ev.originalEvent)).on("mouseout", off)
         .on("click", (ev) => { L.DomEvent.stop(ev); pinEnv(e, ev.originalEvent); });
       poly._envOn = on; poly._envOff = off;
@@ -703,7 +714,9 @@
     let tsVar = "mlcape", tsAz = "";
     const tsPanel = win.querySelector(".ts-panel"), tsSearch = win.querySelector(".ts-search");
     const drawTs = () => { if (!tsPanel.hidden) win.querySelector(".ts-chart").innerHTML = tsChart(si, list, i, tsVar, tsAz); };
+    let shown = null;
     const show = () => {
+      if (shown !== list[i]) { if (shown) pinShow(shown, -1); shown = list[i]; pinShow(shown, 1); render(); }
       win.querySelector(".env-inner").innerHTML = envBody(list[i]);
       win.querySelector(".env-bar-title").textContent = `Supercell ${S[si].label} · hour ${i + 1} of ${list.length}`;
       win.querySelector(".prev").disabled = i === 0;
@@ -733,7 +746,7 @@
     });
     win.querySelector(".prev").addEventListener("click", () => { if (i > 0) { i--; show(); } });
     win.querySelector(".next").addEventListener("click", () => { if (i < list.length - 1) { i++; show(); } });
-    win.querySelector(".env-close").addEventListener("click", () => win.remove());
+    win.querySelector(".env-close").addEventListener("click", () => { win.remove(); if (shown) pinShow(shown, -1); shown = null; render(); });
     win.addEventListener("pointerdown", () => (win.style.zIndex = ++pinZ));
     // start where the hover card was
     win.style.left = envTip.style.left; win.style.top = envTip.style.top;
